@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Dev overlay — H2 in-memory, no external dependencies.
+#   Deploy: kubectl apply -k k8s/overlays/dev
+resources:
+  - ../../base
+
+# V4-06: inject the active Spring profile per environment instead of
+# hardcoding it in the base ConfigMap. Patched onto the base ConfigMap so
+# the base itself stays profile-agnostic.
+patches:
+  - target:
+      kind: ConfigMap
+      name: oms-config
+    patch: |-
+      - op: add
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: dev
+

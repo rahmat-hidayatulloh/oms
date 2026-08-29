@@ -1,0 +1,21 @@
+# ============================================================
+# RoleBinding — OMS
+# ============================================================
+# Binds the oms-role to the oms-service-account.
+# ============================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oms-rolebinding
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+subjects:
+  - kind: ServiceAccount
+    name: oms-service-account
+    namespace: oms-system
+roleRef:
+  kind: Role
+  name: oms-role
+  apiGroup: rbac.authorization.k8s.io

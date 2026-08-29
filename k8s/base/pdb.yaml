@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: oms-pdb
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oms

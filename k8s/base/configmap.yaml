@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oms-config
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+data:
+  # V4-06: SPRING_PROFILES_ACTIVE is intentionally NOT set here. The active
+  # profile must be injected per environment via a Kustomize overlay
+  # (configMapGenerator merge) so this base ConfigMap cannot leak a wrong
+  # profile (e.g. "staging") into a production cluster. See k8s/overlays/.
+  # Application configuration
+  app.payment.api.health-url: "http://localhost:9090/health"
+  app.health-check.timeout: "5s"
+  app.redis.blacklist-duration: "1h"
+  app.redis.cache.ttl-default: "30m"
+  app.email.thread-pool.core-size: "5"
+  app.email.thread-pool.max-size: "10"
+  app.email.queue.capacity: "20"
+  app.retry.max-attempts: "3"
+  app.retry.backoff-delay-ms: "100"
+  app.rate-limit.enabled: "true"
+  app.rate-limit.defaults.capacity: "10"
+  app.rate-limit.defaults.refill-tokens: "10"
+  app.rate-limit.defaults.refill-period: "1m"
+  app.pagination.default-page-size: "20"
+
+  # JWT expiration
+  JWT_EXPIRATION: "3600000"
+  JWT_REFRESH_EXPIRATION: "604800000"
+
+  # Redis (for staging/prod)
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DATABASE: "0"
+
+  # Logging
+  logging.level.com.oms: "INFO"

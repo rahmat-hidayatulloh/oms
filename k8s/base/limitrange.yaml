@@ -1,0 +1,29 @@
+# ============================================================
+# LimitRange — OMS namespace
+# ============================================================
+# Sets default resource requests/limits for containers that
+# do not specify their own. Prevents unbounded resource usage.
+# ============================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: oms-limits
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+spec:
+  limits:
+    - type: Container
+      default:
+        memory: "512Mi"
+        cpu: "500m"
+      defaultRequest:
+        memory: "256Mi"
+        cpu: "250m"
+      max:
+        memory: "2Gi"
+        cpu: "2"
+      min:
+        memory: "128Mi"
+        cpu: "100m"

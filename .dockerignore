@@ -1,0 +1,63 @@
+# ============================================================
+# .dockerignore - OMS Application
+# ============================================================
+# Files and directories to exclude from Docker build context
+# to keep the image small and avoid caching issues.
+# ============================================================
+
+# Build output
+target/
+*.class
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs
+logs/
+*.log
+*.log.gz
+
+# Environment / Sensitive files
+.env
+.env.*.local
+application-local.yml
+
+# Test reports
+test-output/
+surefire-reports/
+jacoco.exec
+
+# Temp files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose*.yml
+Dockerfile
+
+# Node
+node_modules/
+package.json
+package-lock.json
+
+# Documentation (not needed at runtime)
+docs/

@@ -1,16 +1,9 @@
-# Compiled class file
+# ============================
+# Java / Maven
+# ============================
+target/
+!.mvn/wrapper/maven-wrapper.jar
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
@@ -18,7 +11,112 @@
 *.zip
 *.tar.gz
 *.rar
+*.jar.original
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# ============================
+# Maven Wrapper
+# ============================
+.mvn/wrapper/maven-wrapper.jar
+
+# ============================
+# IDE - IntelliJ IDEA
+# ============================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ============================
+# IDE - Eclipse
+# ============================
+.project
+.classpath
+.settings/
+bin/
+
+# ============================
+# IDE - VS Code
+# ============================
+.vscode/
+*.code-workspace
+
+# ============================
+# IDE - NetBeans
+# ============================
+nbproject/
+nbactions.xml
+nb-configuration.xml
+
+# ============================
+# OS
+# ============================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ============================
+# Logs
+# ============================
+logs/
+*.log
+*.log.gz
+
+# ============================
+# Environment / Sensitive Config
+# ============================
+env/*.properties
+!env/*.example.properties
+.env
+.env.local
+.env.*.local
+application-local.yml
+application-local.properties
+application-dev-local.yml
+application-dev-local.properties
+
+# ============================
+# Build / Dependency
+# ============================
+dependency-reduced-pom.xml
+build/
+
+# ============================
+# Test Reports
+# ============================
+test-output/
+surefire-reports/
+jacoco.exec
+*.xml.bak
+
+# ============================
+# Spring Boot
+# ============================
+!.mvn/wrapper/maven-wrapper.properties
+spring-pid-*.pid
+*.h2.db
+*.mv.db
+*.trace.db
+
+# ============================
+# Java Heap Dumps
+# ============================
+heapdump*.hprof
+*.hprof
+
+# ============================
+# Temp files
+# ============================
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ============================
+# OS generated files
+# ============================
+ehthumbs.db
+*.lnk
+desktop.ini

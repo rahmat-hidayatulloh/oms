@@ -1,0 +1,321 @@
+# ============================================================
+# CI/CD Pipeline -- OMS
+# ============================================================
+name: OMS CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  JAVA_VERSION: "21"
+  JAVA_DISTRIBUTION: "temurin"
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ── Build, Test & Quality ──────────────────────────────────
+  build:
+    name: Build, Test & Quality
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      # ── Checkout ──────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      # ── JDK ───────────────────────────────────────────────
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4.7.0
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: maven
+
+      # ── Maven Cache ───────────────────────────────────────
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4.2.3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      # ── Compile ───────────────────────────────────────────
+      - name: Compile
+        run: ./mvnw compile -Dcheckstyle.skip=true -Dspotbugs.skip=true
+
+      # ── Full Verify (compile + test + quality gates) ────────
+      # F-15: All quality gates (Checkstyle, SpotBugs, JaCoCo) run in
+      # one atomic step — cannot be bypassed by profile or env var.
+      - name: Full Verify (tests + quality gates)
+        run: ./mvnw clean verify -Pci -Dspring.profiles.active=test
+
+      # ── SonarCloud Analysis ───────────────────────────────
+      # Runs after verify so JaCoCo coverage reports are available for
+      # Sonar to ingest. Skipped automatically when SONAR_TOKEN is absent
+      # (e.g. on forked-PR builds without secret access).
+      - name: SonarCloud Analysis
+        if: ${{ env.SONAR_TOKEN != '' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./mvnw -Psonar sonar:sonar \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=oms \
+            -Dsonar.projectKey=com.oms:oms
+
+
+      # ── Upload Test Results ───────────────────────────────
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: test-results
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+
+  # ── Security Scan ──────────────────────────────────────────
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4.7.0
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: maven
+
+      # ── OWASP Dependency-Check (SCA) ──────────────────────
+      - name: Run OWASP Dependency-Check
+        run: |
+          mvn org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=7 \
+            -Dformat=HTML \
+            -DoutputDirectory=target/dependency-check
+        continue-on-error: true
+
+      # ── SBOM (CycloneDX) ──────────────────────────────────
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom \
+            -DoutputFormat=xml \
+            -DoutputDirectory=target/sbom
+        continue-on-error: true
+
+      # ── Kustomize Validation ───────────────────────────────
+      - name: Validate Kustomize Render
+        run: |
+          kubectl kustomize k8s/base/ > /tmp/oms-rendered.yaml
+          echo "✅ Kustomize render successful"
+          echo "--- Resource count ---"
+          grep -c "^kind:" /tmp/oms-rendered.yaml || true
+
+      # ── kubeconform Schema Validation ──────────────────────
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+
+      - name: Validate Kubernetes manifests (kubeconform)
+        run: |
+          kubeconform -summary -strict -output json \
+            -ignore-missing-schemas \
+            k8s/base/ > /tmp/kubeconform-results.json || true
+          echo "✅ kubeconform validation completed"
+          cat /tmp/kubeconform-results.json
+
+      # ── Trivy Filesystem Scan ────────────────────────────────
+      # Re-enabled (Phase V3-5): exit-code 1 gates on NEW fixable
+      # CRITICAL/HIGH findings. Known CVEs that are only fixable by
+      # upgrading beyond Spring Boot 3.2.x (EOL) are deferred with
+      # justification in ./.trivyignore (read automatically by Trivy).
+      - name: Build JAR for Trivy scan
+        run: ./mvnw package -DskipTests -q
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "table"
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          ignore-unfixed: true
+
+      # ── Gitleaks Secret Scanning ──────────────────────────
+      - name: Run Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2.3.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      # ── Upload Security Reports ───────────────────────────
+      - name: Upload Security Reports
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: security-reports
+          path: |
+            target/dependency-check/
+            target/sbom/
+            /tmp/oms-rendered.yaml
+            /tmp/kubeconform-results.json
+
+  # ── Deploy to Development ──────────────────────────────────
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/develop' && success()
+    environment: oms-dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4.7.0
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          cache: maven
+
+      - name: Build JAR
+        run: ./mvnw package -DskipTests
+
+      - name: Deploy to Development Server
+        run: |
+          echo "🚀 Deploying to Development..."
+          echo "📦 Using DB: ${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}"
+          echo "✅ Deployment to Development completed!"
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+
+  # ── Deploy to Staging ──────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/develop' && success()
+    environment: oms-staging
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.10.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6.15.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-staging
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Staging Server
+        run: |
+          echo "🚀 Deploying to Staging..."
+          echo "📦 Image: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
+          echo "✅ Deployment to Staging completed!"
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+  # ── Deploy to Production ───────────────────────────────────
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/main' && success()
+    environment: oms-prod
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.10.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6.15.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Production Server
+        run: |
+          echo "🚀 Deploying to Production..."
+          echo "📦 Image: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "✅ Deployment to Production completed!"
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}

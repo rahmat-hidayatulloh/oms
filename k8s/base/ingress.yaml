@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oms-ingress
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "8m"
+    nginx.ingress.kubernetes.io/hsts: "true"
+    nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
+    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+    # IP allowlist — restrict access to trusted CIDRs in production.
+    # Default: 0.0.0.0/0 (all); override per environment via kustomize patches
+    # or annotation patches in overlay directories.
+    nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - oms.local
+      secretName: oms-tls
+  rules:
+    - host: oms.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oms-service
+                port:
+                  number: 8080

@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: oms-system
+
+# V4-08: `labels` (Kustomize v5+) replaces deprecated `commonLabels`.
+# Unlike `commonLabels`, `labels` does NOT add to `spec.selector`, avoiding
+# immutable-field errors on Deployment/StatefulSet updates.
+labels:
+  - pairs:
+      app.kubernetes.io/name: oms
+      app.kubernetes.io/part-of: oms
+
+# ─── Base manifests (environment-agnostic) ───────────────────────────
+#   This is the shared base. Do NOT deploy it directly for a real
+#   environment: the active Spring profile is injected by an overlay
+#   under k8s/overlays/<env>/ (V4-06). Deploy an overlay instead, e.g.:
+#     kubectl apply -k k8s/overlays/dev
+#     kubectl apply -k k8s/overlays/staging
+#     kubectl apply -k k8s/overlays/prod
+#
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - serviceaccount.yaml
+  - role.yaml
+  - rolebinding.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - resourcequota.yaml
+  - limitrange.yaml
+

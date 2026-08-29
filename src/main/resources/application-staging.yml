@@ -1,0 +1,105 @@
+spring:
+  # PostgreSQL Database (Docker)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 15
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1200000
+      pool-name: OmsStagingPool
+      leak-detection-threshold: 600000
+      connection-test-query: SELECT 1
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway manages the schema; Hibernate only validates it.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # Redis for staging
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:9}
+      enabled: true
+      # V4-05: connection pooling for staging (smaller than prod — staging
+      # does not need the same pool size, but pooling prevents connection
+      # exhaustion during load testing and keeps behavior consistent with prod)
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 2
+
+  # H2 Console disabled for staging
+  h2:
+    console:
+      enabled: false
+
+# JWT for staging
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000}
+
+# Staging logging
+logging:
+  level:
+    com.oms: INFO
+    org.springframework: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/oms-staging.log
+    max-size: 10MB
+    max-history: 7
+
+# Actuator for staging
+# V4-04: `env` endpoint intentionally NOT exposed. It can leak resolved
+# configuration (including sensitive property names/values) and is not needed
+# for staging observability. Prometheus/metrics/health cover monitoring.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+  tracing:
+    enabled: true
+    sampling:
+      probability: 0.5  # 50% sampling for staging
+
+# Zipkin exporter endpoint — must be set via ZIPKIN_ENDPOINT environment variable
+tracing:
+  zipkin:
+    endpoint: ${ZIPKIN_ENDPOINT}
+
+# Application Configuration is centralized in application.yml
+# (shared across profiles).
+
+# CORS for staging — staging frontend domain
+app:
+  cors:
+    allowed-origins:
+      - "https://staging.oms.com"

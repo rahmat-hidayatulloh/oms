@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+        Logback configuration with structured logging support via MDC.
+        Includes traceId, userId, method, and path in every log entry.
+
+        Three appenders are configured:
+        1. CONSOLE (default) - human-readable with MDC context
+        2. JSON_FILE        - structured JSON format for log aggregation (ELK, Datadog, etc.)
+        3. CONSOLE_JSON     - JSON format for container environments (Kubernetes, Docker)
+    -->
+
+    <!-- Spring Boot default logback configuration -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- ============================================================ -->
+    <!-- Property: Application name for log identification            -->
+    <!-- ============================================================ -->
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="oms"/>
+    <springProperty scope="context" name="activeProfile" source="spring.profiles.active" defaultValue="dev"/>
+
+    <!-- ============================================================ -->
+    <!-- Appender 1: Console (Human-readable with MDC)                -->
+    <!-- ============================================================ -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{36})
+                [traceId=%X{traceId:-}] [userId=%X{userId:-}] [%X{method:-} %X{path:-}]
+                - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- Appender 2: JSON File (Structured logging for ELK/Datadog)   -->
+    <!-- ============================================================ -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/${appName}-${activeProfile}.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/${appName}-${activeProfile}-%d{yyyy-MM-dd}.json.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Include MDC fields in JSON output -->
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>method</includeMdcKeyName>
+            <includeMdcKeyName>path</includeMdcKeyName>
+
+            <!-- Custom fields -->
+            <customFields>{"application":"${appName}","profile":"${activeProfile}"}</customFields>
+
+            <!-- Exclude default fields to reduce noise -->
+            <fieldNames>
+                <timestamp>@timestamp</timestamp>
+                <version>[ignore]</version>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <level>level</level>
+                <message>message</message>
+                <stackTrace>stackTrace</stackTrace>
+                <mdc>mdc</mdc>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- Appender 3: Console JSON (For container environments)         -->
+    <!-- ============================================================ -->
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>method</includeMdcKeyName>
+            <includeMdcKeyName>path</includeMdcKeyName>
+            <customFields>{"application":"${appName}","profile":"${activeProfile}"}</customFields>
+            <fieldNames>
+                <timestamp>@timestamp</timestamp>
+                <version>[ignore]</version>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <level>level</level>
+                <message>message</message>
+                <stackTrace>stackTrace</stackTrace>
+                <mdc>mdc</mdc>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- Profile-specific configurations                               -->
+    <!-- ============================================================ -->
+
+    <!-- Dev profile: Human-readable console only -->
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.oms" level="DEBUG"/>
+    </springProfile>
+
+    <!-- Staging profile: Human-readable console + JSON file -->
+    <springProfile name="staging">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="JSON_FILE"/>
+        </root>
+        <logger name="com.oms" level="INFO"/>
+    </springProfile>
+
+    <!-- Production profile: JSON console (for container/cloud) + JSON file -->
+    <springProfile name="prod">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE_JSON"/>
+            <appender-ref ref="JSON_FILE"/>
+        </root>
+        <logger name="com.oms" level="WARN"/>
+    </springProfile>
+
+    <!-- Test profile: Human-readable console only -->
+    <springProfile name="test">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.oms" level="DEBUG"/>
+    </springProfile>
+
+</configuration>

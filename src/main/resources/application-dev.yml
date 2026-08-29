@@ -1,0 +1,102 @@
+spring:
+  # H2 In-Memory Database
+  datasource:
+    url: jdbc:h2:mem:omsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1200000
+      pool-name: OmsDevPool
+      leak-detection-threshold: 300000
+      connection-test-query: SELECT 1
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # Flyway manages the schema; Hibernate only validates it.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # H2 Console (hanya untuk dev)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+  # Redis disabled for dev
+  data:
+    redis:
+      enabled: false
+
+  # Devtools configuration
+  devtools:
+    restart:
+      enabled: true
+      additional-paths:
+        - src/main/java
+        - src/main/resources
+      exclude:
+        - static/**
+        - public/**
+        - "**/logback-*.xml"
+        - "**/logback.xml"
+        - target/**
+    livereload:
+      enabled: true
+      port: 35729
+
+# JWT for development
+jwt:
+  # V4-09: explicit non-production dev secret (≥32 chars for HS256) so local
+  # dev runs without exporting JWT_SECRET. This value is NOT used in
+  # staging/prod, which require JWT_SECRET from the environment/secret manager.
+  secret: ${JWT_SECRET:dev-only-secret-key-not-for-production-use-min-32-chars}
+  expiration: ${JWT_EXPIRATION:3600000}
+
+# Development logging
+logging:
+  level:
+    com.oms: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{36}) - %msg%n"
+
+# Actuator for dev
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+
+# Application Configuration is centralized in application.yml
+# (shared across profiles).
+
+# CORS for development — localhost only
+app:
+  cors:
+    allowed-origins:
+      - "http://localhost:3000"
+      - "http://127.0.0.1:3000"
+      - "https://localhost:3000"

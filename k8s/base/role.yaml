@@ -1,0 +1,18 @@
+# ============================================================
+# Role — OMS
+# ============================================================
+# Minimal RBAC: the application does not need Kubernetes API
+# access. automountServiceAccountToken is false on the SA.
+# This empty Role is defined for future extension and to
+# satisfy policy-as-code tools that require an explicit
+# Role + RoleBinding for every ServiceAccount.
+# ============================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: oms-role
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+rules: []

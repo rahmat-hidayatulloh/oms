@@ -1,0 +1,1392 @@
+{
+  "info": {
+    "name": "OMS API Collection",
+    "description": "Postman Collection for OMS (Order Management System) API\n\n## Base URL\nAll endpoints are prefixed with `{{baseUrl}}` (default: `http://localhost:8080`).\n\n## Authentication\n1. Call `POST /api/v1/auth/login` to obtain `accessToken` and `refreshToken`.\n2. The `accessToken` is automatically attached to subsequent requests via the pre-request script.\n3. When the `accessToken` expires, use `POST /api/v1/auth/refresh` to obtain a new token pair.\n\n## Collection Variables\n- `productId` — ID of the last created/updated product\n- `orderId` — ID of the last created order\n- `orderNumber` — order number of the last created order\n\n## Environment Variables\n- `{{baseUrl}}` — API base URL\n- `{{accessToken}}` — JWT Bearer token for authenticated requests\n- `{{refreshToken}}` — JWT token used to obtain a new access token",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Auto-attach Authorization header for protected endpoints",
+          "var accessToken = pm.environment.get('accessToken');",
+          "var url = pm.request.url.toString();",
+          "",
+          "// Public endpoints that don't need auth",
+          "var publicEndpoints = [",
+          "    '/auth/login',",
+          "    '/auth/register',",
+          "    '/auth/refresh',",
+          "    '/auth/csrf',",
+          "    '/api/version',",
+          "    '/actuator/health'];",
+          "",
+          "var isPublic = publicEndpoints.some(function(endpoint) {",
+          "    return url.includes(endpoint);",
+          "});",
+          "",
+          "if (!isPublic && accessToken) {",
+          "    // Token will be added via collection-level auth",
+          "    console.log('Using Bearer token for: ' + url);",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "// Global validation for all responses",
+          "pm.test('Response status is 2xx', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+          "});",
+          "",
+          "pm.test('Response time < 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('Content-Type is present', function () {",
+          "    pm.response.to.have.header('Content-Type');",
+          "});"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints for login, token refresh, and logout.\n\n## Flow\n1. Login → obtain `accessToken` and `refreshToken`\n2. Use `accessToken` in Bearer Authorization header\n3. When expired → `refresh` endpoint to get new tokens\n4. Logout → blacklists the current access token",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has accessToken, refreshToken, and tokenType', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('accessToken');",
+                  "    pm.expect(jsonData).to.have.property('refreshToken');",
+                  "    pm.expect(jsonData).to.have.property('tokenType');",
+                  "});",
+                  "",
+                  "pm.test('accessToken is a valid JWT (3 parts)', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.accessToken.split('.')).to.have.lengthOf(3);",
+                  "});",
+                  "",
+                  "pm.test('Set environment variables with tokens', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('accessToken', jsonData.accessToken);",
+                  "    pm.environment.set('refreshToken', jsonData.refreshToken);",
+                  "    pm.environment.set('tokenType', jsonData.tokenType);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{adminUsername}}\",\n    \"password\": \"{{adminPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate with username and password. Returns accessToken, refreshToken, and tokenType."
+          },
+          "response": [
+            {
+              "name": "Login Success (Admin)",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NTI0MDAwMDAsImV4cCI6MTc1MjQwMzYwMH0.signature\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsInRva2VuX3R5cGUiOiJyZWZyZXNoIiwiaWF0IjoxNzUyNDAwMDAwLCJleHAiOjE3NTMwMDQ4MDB9.signature\",\n    \"tokenType\": \"Bearer\"\n}"
+            },
+            {
+              "name": "Login Failed (Invalid Credentials)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/401\",\n    \"title\": \"Authentication Failed\",\n    \"status\": 401,\n    \"detail\": \"Bad credentials\",\n    \"instance\": \"/api/v1/auth/login\",\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has username, email, role, and message', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('username');",
+                  "    pm.expect(jsonData).to.have.property('email');",
+                  "    pm.expect(jsonData).to.have.property('role');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});",
+                  "",
+                  "pm.test('Registered role is CUSTOMER', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.role).to.eql('CUSTOMER');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"newcustomer\",\n    \"email\": \"newcustomer@example.com\",\n    \"password\": \"{{customerPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Public endpoint. Registers a new CUSTOMER account. Responds 201 with username, email, role, and message."
+          },
+          "response": [
+            {
+              "name": "Register Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"newcustomer\",\n    \"email\": \"newcustomer@example.com\",\n    \"password\": \"{{customerPassword}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"username\": \"newcustomer\",\n    \"email\": \"newcustomer@example.com\",\n    \"role\": \"CUSTOMER\",\n    \"message\": \"User registered successfully\"\n}"
+            },
+            {
+              "name": "Register Failed (Duplicate Username)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"newcustomer\",\n    \"email\": \"newcustomer@example.com\",\n    \"password\": \"{{customerPassword}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/400\",\n    \"title\": \"Bad Request\",\n    \"status\": 400,\n    \"detail\": \"Username 'newcustomer' is already taken\",\n    \"instance\": \"/api/v1/auth/register\",\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has new tokens', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('accessToken');",
+                  "    pm.expect(jsonData).to.have.property('refreshToken');",
+                  "});",
+                  "",
+                  "pm.test('Update environment variables with new tokens', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('accessToken', jsonData.accessToken);",
+                  "    pm.environment.set('refreshToken', jsonData.refreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Obtain a new access token using a valid refresh token."
+          },
+          "response": [
+            {
+              "name": "Refresh Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiJ9.newAccessToken.signature\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiJ9.newRefreshToken.signature\",\n    \"tokenType\": \"Bearer\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Clear tokens after logout', function () {",
+                  "    pm.environment.set('accessToken', '');",
+                  "    pm.environment.set('refreshToken', '');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Logout and blacklist the current access token."
+          },
+          "response": [
+            {
+              "name": "Logout Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get CSRF Token",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/csrf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "csrf"
+              ]
+            },
+            "description": "Retrieve CSRF token for state-changing requests."
+          },
+          "response": [
+            {
+              "name": "CSRF Token Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"token\": \"csrf-token-value\",\n    \"headerName\": \"X-CSRF-TOKEN\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "description": "Product management endpoints for CRUD operations and search.\n\n## Roles\n- **ADMIN**: Can create, update, delete products\n- **CUSTOMER**: Can view products only\n\n## Collection Variables\n- `productId` — automatically set after product creation or retrieval",
+      "item": [
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has product data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "    pm.expect(jsonData).to.have.property('price');",
+                  "    pm.expect(jsonData).to.have.property('category');",
+                  "});",
+                  "",
+                  "pm.test('Set collection variable productId', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('productId', jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Kaos Polos Hitam\",\n    \"description\": \"Kaos katun premium hitam size L\",\n    \"price\": 85000.00,\n    \"stock\": 100,\n    \"category\": \"CLOTHING\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ]
+            },
+            "description": "Create a new product (ADMIN only)."
+          },
+          "response": [
+            {
+              "name": "Create Product Success",
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Kaos Polos Hitam\",\n    \"description\": \"Kaos katun premium hitam size L\",\n    \"price\": 85000.00,\n    \"stock\": 100,\n    \"category\": \"CLOTHING\",\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:00:00\"\n}"
+            },
+            {
+              "name": "Create Product Failed (Validation)",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/400\",\n    \"title\": \"Validation Failed\",\n    \"status\": 400,\n    \"detail\": \"Request validation failed\",\n    \"instance\": \"/api/v1/products\",\n    \"fieldErrors\": {\n        \"name\": \"Product name must be between 3 and 100 characters\",\n        \"price\": \"Price must be greater than 0\"\n    },\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Each product has required fields', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    jsonData.forEach(function(product) {",
+                  "        pm.expect(product).to.have.property('id');",
+                  "        pm.expect(product).to.have.property('name');",
+                  "        pm.expect(product).to.have.property('price');",
+                  "        pm.expect(product).to.have.property('category');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Set productId from first product', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.collectionVariables.set('productId', jsonData[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ]
+            },
+            "description": "Retrieve all active (non-deleted) products."
+          },
+          "response": [
+            {
+              "name": "Get All Products Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n    {\n        \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n        \"name\": \"Kaos Polos Hitam\",\n        \"description\": \"Kaos katun premium hitam size L\",\n        \"price\": 85000.00,\n        \"stock\": 100,\n        \"category\": \"CLOTHING\",\n        \"createdAt\": \"2026-08-06T15:00:00\",\n        \"updatedAt\": \"2026-08-06T15:00:00\"\n    }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Get Product By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has valid product data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "    pm.expect(jsonData).to.have.property('price');",
+                  "});",
+                  "",
+                  "pm.test('Product ID matches request', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('productId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Retrieve a product by its UUID."
+          },
+          "response": [
+            {
+              "name": "Get Product By ID Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Kaos Polos Hitam\",\n    \"description\": \"Kaos katun premium hitam size L\",\n    \"price\": 85000.00,\n    \"stock\": 100,\n    \"category\": \"CLOTHING\",\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:00:00\"\n}"
+            },
+            {
+              "name": "Product Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/404\",\n    \"title\": \"Resource Not Found\",\n    \"status\": 404,\n    \"detail\": \"Product not found with id: '550e8400-e29b-41d4-a716-446655449999'\",\n    \"instance\": \"/api/v1/products/550e8400-e29b-41d4-a716-446655449999\",\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Search Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has pagination fields', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('content');",
+                  "    pm.expect(jsonData).to.have.property('totalElements');",
+                  "    pm.expect(jsonData).to.have.property('totalPages');",
+                  "});",
+                  "",
+                  "pm.test('Set productId from search results', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.content && jsonData.content.length > 0) {",
+                  "        pm.collectionVariables.set('productId', jsonData.content[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/search?name=kaos&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "kaos"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Search products with filters and pagination."
+          },
+          "response": [
+            {
+              "name": "Search Products Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"content\": [\n        {\n            \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n            \"name\": \"Kaos Polos Hitam\",\n            \"price\": 85000.00,\n            \"category\": \"CLOTHING\"\n        }\n    ],\n    \"totalElements\": 1,\n    \"totalPages\": 1,\n    \"number\": 0,\n    \"size\": 10\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Product data updated', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.name).to.eql('Kaos Polos Hitam Premium');",
+                  "    pm.expect(jsonData.price).to.eql(90000.00);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Kaos Polos Hitam Premium\",\n    \"description\": \"Kaos katun premium hitam size L - edisi terbaru\",\n    \"price\": 90000.00,\n    \"stock\": 150,\n    \"category\": \"CLOTHING\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Update an existing product (ADMIN only)."
+          },
+          "response": [
+            {
+              "name": "Update Product Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Kaos Polos Hitam Premium\",\n    \"description\": \"Kaos katun premium hitam size L - edisi terbaru\",\n    \"price\": 90000.00,\n    \"stock\": 150,\n    \"category\": \"CLOTHING\",\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:05:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Verify product is soft-deleted', function () {",
+                  "    pm.sendRequest({",
+                  "        url: pm.environment.get('baseUrl') + '/api/v1/products/' + pm.collectionVariables.get('productId'),",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + pm.environment.get('accessToken') }",
+                  "    }, function (err, res) {",
+                  "        pm.test('Deleted product returns 404', function () {",
+                  "            pm.expect(res.code).to.eql(404);",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "Soft-delete a product (ADMIN only)."
+          },
+          "response": [
+            {
+              "name": "Delete Product Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"message\": \"Product deleted successfully\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "description": "Order management endpoints for creating and viewing orders.\n\n## Roles\n- **ADMIN**: Can view all orders\n- **CUSTOMER**: Can create orders and view their own orders only\n\n## Collection Variables\n- `orderId` — automatically set after order creation\n- `orderNumber` — automatically set after order creation",
+      "item": [
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has order data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('orderNumber');",
+                  "    pm.expect(jsonData).to.have.property('totalAmount');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "});",
+                  "",
+                  "pm.test('Order number has correct format OMS-YYYYMMDD-NNNN', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.orderNumber).to.match(/^OMS-\\\\d{8}-\\\\d{4}$/);",
+                  "});",
+                  "",
+                  "pm.test('Status is PENDING', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('PENDING');",
+                  "});",
+                  "",
+                  "pm.test('Set collection variables', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('orderId', jsonData.id);",
+                  "    pm.collectionVariables.set('orderNumber', jsonData.orderNumber);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"items\": [\n        {\n            \"productId\": \"{{productId}}\",\n            \"quantity\": 2\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "Create a new order with product items."
+          },
+          "response": [
+            {
+              "name": "Create Order Success",
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"id\": \"660e8400-e29b-41d4-a716-446655440000\",\n    \"orderNumber\": \"OMS-20260806-4821\",\n    \"userId\": \"770e8400-e29b-41d4-a716-446655440000\",\n    \"totalAmount\": 170000.00,\n    \"status\": \"PENDING\",\n    \"items\": [\n        {\n            \"productId\": \"550e8400-e29b-41d4-a716-446655440000\",\n            \"productName\": \"Kaos Polos Hitam\",\n            \"quantity\": 2,\n            \"price\": 85000.00,\n            \"subtotal\": 170000.00\n        }\n    ],\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has pagination', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('content');",
+                  "    pm.expect(jsonData).to.have.property('totalElements');",
+                  "});",
+                  "",
+                  "pm.test('Set orderId from first order', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.content && jsonData.content.length > 0) {",
+                  "        pm.collectionVariables.set('orderId', jsonData.content[0].id);",
+                  "        pm.collectionVariables.set('orderNumber', jsonData.content[0].orderNumber);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "Retrieve all orders (ADMIN only)."
+          },
+          "response": [
+            {
+              "name": "Get All Orders Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"content\": [\n        {\n            \"id\": \"660e8400-e29b-41d4-a716-446655440000\",\n            \"orderNumber\": \"OMS-20260806-4821\",\n            \"totalAmount\": 170000.00,\n            \"status\": \"PENDING\",\n            \"items\": [\n                {\n                    \"productId\": \"550e8400-e29b-41d4-a716-446655440000\",\n                    \"productName\": \"Kaos Polos Hitam\",\n                    \"quantity\": 2,\n                    \"price\": 85000.00,\n                    \"subtotal\": 170000.00\n                }\n            ],\n            \"createdAt\": \"2026-08-06T15:00:00\"\n        }\n    ],\n    \"totalElements\": 1,\n    \"totalPages\": 1,\n    \"number\": 0,\n    \"size\": 10\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Order By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order ID matches request', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('orderId'));",
+                  "});",
+                  "",
+                  "pm.test('Order has items', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.items).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Retrieve an order by its UUID."
+          },
+          "response": [
+            {
+              "name": "Get Order By ID Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"id\": \"660e8400-e29b-41d4-a716-446655440000\",\n    \"orderNumber\": \"OMS-20260806-4821\",\n    \"userId\": \"770e8400-e29b-41d4-a716-446655440000\",\n    \"totalAmount\": 170000.00,\n    \"status\": \"PENDING\",\n    \"items\": [\n        {\n            \"productId\": \"550e8400-e29b-41d4-a716-446655440000\",\n            \"productName\": \"Kaos Polos Hitam\",\n            \"quantity\": 2,\n            \"price\": 85000.00,\n            \"subtotal\": 170000.00\n        }\n    ],\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Verify order is soft-deleted', function () {",
+                  "    pm.sendRequest({",
+                  "        url: pm.environment.get('baseUrl') + '/api/v1/orders/' + pm.collectionVariables.get('orderId'),",
+                  "        method: 'GET',",
+                  "        header: { 'Authorization': 'Bearer ' + pm.environment.get('accessToken') }",
+                  "    }, function (err, res) {",
+                  "        pm.test('Deleted order returns 404', function () {",
+                  "            pm.expect(res.code).to.eql(404);",
+                  "        });",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "description": "Soft-delete an order (ADMIN only)."
+          },
+          "response": [
+            {
+              "name": "Delete Order Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"message\": \"Order deleted successfully\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Admin-specific endpoints for dashboard and user management.\n\n## Roles\n- **ADMIN**: Can access all admin endpoints",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has dashboard data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('totalUsers');",
+                  "    pm.expect(jsonData).to.have.property('totalProducts');",
+                  "    pm.expect(jsonData).to.have.property('totalOrders');",
+                  "    pm.expect(jsonData).to.have.property('revenue');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "dashboard"
+              ]
+            },
+            "description": "Retrieve admin dashboard statistics."
+          },
+          "response": [
+            {
+              "name": "Dashboard Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"totalUsers\": 10,\n    \"totalProducts\": 25,\n    \"totalOrders\": 50,\n    \"revenue\": 12500000.00\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Each user has required fields', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    jsonData.forEach(function(user) {",
+                  "        pm.expect(user).to.have.property('id');",
+                  "        pm.expect(user).to.have.property('username');",
+                  "        pm.expect(user).to.have.property('role');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Retrieve all registered users (ADMIN only)."
+          },
+          "response": [
+            {
+              "name": "Get All Users Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n    {\n        \"id\": \"770e8400-e29b-41d4-a716-446655440000\",\n        \"username\": \"admin\",\n        \"email\": \"admin@oms.com\",\n        \"role\": \"ADMIN\",\n        \"createdAt\": \"2026-01-01T00:00:00\"\n    },\n    {\n        \"id\": \"770e8400-e29b-41d4-a716-446655440001\",\n        \"username\": \"customer\",\n        \"email\": \"customer@oms.com\",\n        \"role\": \"CUSTOMER\",\n        \"createdAt\": \"2026-01-15T00:00:00\"\n    }\n]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "description": "System-level endpoints for health checks and API information.",
+      "item": [
+        {
+          "name": "Get API Version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has version info', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('version');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/version",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "version"
+              ]
+            },
+            "description": "Retrieve API version information."
+          },
+          "response": [
+            {
+              "name": "API Version Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"name\": \"OMS API\",\n    \"version\": \"1.0.0\",\n    \"environment\": \"development\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has health status', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Health check endpoint for monitoring."
+          },
+          "response": [
+            {
+              "name": "Health Check Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"status\": \"UP\",\n    \"components\": {\n        \"db\": {\"status\": \"UP\"},\n        \"redis\": {\"status\": \"UP\"},\n        \"diskSpace\": {\"status\": \"UP\"}\n    }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string",
+      "description": "ID of the last created/retrieved product"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string",
+      "description": "ID of the last created/retrieved order"
+    },
+    {
+      "key": "orderNumber",
+      "value": "",
+      "type": "string",
+      "description": "Order number of the last created order"
+    },
+    {
+      "key": "tokenExpired",
+      "value": "false",
+      "type": "string",
+      "description": "Flag to indicate if token has expired"
+    }
+  ]
+}

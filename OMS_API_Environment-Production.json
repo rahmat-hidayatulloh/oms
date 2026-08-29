@@ -1,0 +1,48 @@
+{
+  "name": "OMS API - Production",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.oms.com",
+      "type": "default",
+      "description": "API base URL for production environment (from env/omsdb-prod.properties)"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "default",
+      "description": "JWT Bearer token obtained from login endpoint"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "default",
+      "description": "JWT token used to obtain a new access token"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin",
+      "type": "default",
+      "description": "Admin username"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "type": "default",
+      "description": "Admin password. Fill from GitHub Actions secret ADMIN_PASSWORD; never commit plaintext."
+    },
+    {
+      "key": "customerUsername",
+      "value": "customer",
+      "type": "default",
+      "description": "Customer username"
+    },
+    {
+      "key": "customerPassword",
+      "value": "",
+      "type": "default",
+      "description": "Customer password. Fill from GitHub Actions secret CUSTOMER_PASSWORD; never commit plaintext."
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

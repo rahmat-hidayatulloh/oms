@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+
+    <!-- V5-P0: package by-layer -> by-feature. Pola diarahkan ke struktur feature
+         (auth/order/product/admin/audit/system); cakupan bug-pattern tetap sama
+        seperti struktur by-layer sebelumnya. -->
+
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin)\.controller.*|com\.oms\.system.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin|audit)\.service.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.auth\.(security|validation).*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.ratelimit.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.config.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.audit\.aspect.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin)\.controller.*|com\.oms\.system.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin|audit)\.service.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.auth\.(security|validation).*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.ratelimit.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.config.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.audit\.aspect.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin)\.controller.*|com\.oms\.system.*"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin|audit)\.service.*"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.auth\.(security|validation).*"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- V4-10: UUF_UNUSED_FIELD excludes removed — unused fields have been
+         cleaned up; keeping these excludes would hide legitimate code smells. -->
+
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|audit)\.repository.*"/>
+        <Bug pattern="NP_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!-- V4-10: UPM_UNCALLED_PRIVATE_METHOD excludes removed — uncalled private
+         methods have been cleaned up; keeping these excludes would hide dead code. -->
+
+    <!-- V4-10: URF_UNREAD_FIELD exclude removed — unread fields have been
+         cleaned up; keeping this exclude would hide unused state. -->
+
+    <Match>
+        <Class name="~com\.oms\.order\.entity\.Order.*"/>
+        <Bug code="EI"/>
+    </Match>
+    <Match>
+        <Class name="~com\.oms\.order\.entity\.OrderItem.*"/>
+        <Bug code="EI"/>
+    </Match>
+
+    <Match>
+        <Class name="~com\.oms\.auth\.security\.JwtTokenProvider.*"/>
+        <Bug code="CT"/>
+    </Match>
+
+    <!-- UserDetailsAdapter wraps a non-serializable User entity by design (SOLID L-2 adapter) -->
+    <Match>
+        <Class name="~com\.oms\.auth\.security\.UserDetailsAdapter"/>
+        <Bug pattern="SE_BAD_FIELD"/>
+    </Match>
+
+    <Match>
+        <Package name="~com\.oms\.exception.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- DTOs are data carriers; mutable field exposure is by design.
+         Restricted to specific EI patterns instead of a blanket package exclude. -->
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin)\.dto.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|admin)\.dto.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|audit)\.entity.*|com\.oms\.entity.*"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Package name="~com\.oms\.(auth|order|product|audit)\.entity.*|com\.oms\.entity.*"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

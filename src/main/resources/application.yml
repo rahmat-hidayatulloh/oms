@@ -1,0 +1,199 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: oms
+
+  # Profile must be set via SPRING_PROFILES_ACTIVE environment variable.
+  # Do NOT set a default here to prevent accidental dev activation in
+  # production (see F-22 remediation).
+  # profiles.active is intentionally NOT set — use env var instead.
+  config:
+    import: optional:file:./env/omsdb-${spring.profiles.active}.properties
+
+  # Jackson serialization
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Jakarta
+
+  # JPA default config (akan di-override per profile)
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  # Redis default config (akan di-override per profile)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      connect-timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+
+# JWT Configuration
+jwt:
+  # V4-09: no weak fallback secret here. Non-dev profiles require JWT_SECRET to
+  # be provided via environment/secret manager; startup fails fast otherwise.
+  # The dev profile supplies an explicit non-production test secret.
+  secret: ${JWT_SECRET:?JWT_SECRET environment variable is required (min 32 chars for HS256)}
+  expiration: ${JWT_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+# Logging default (pattern is defined in logback-spring.xml)
+logging:
+  level:
+    com.oms: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+
+# Application Configuration
+app:
+  # Health Check
+  payment:
+    api:
+      health-url: ${HEALTH_URL:http://localhost:9090/health}
+  health-check:
+    timeout: 5s
+
+  # Error / RFC 7807 ProblemDetail
+  error:
+    base-url: ${ERROR_BASE_URL:https://api.oms.com/errors}
+
+  # Redis / Refresh Token
+  redis:
+    blacklist-duration: 1h
+    cache:
+      ttl-default: 30m
+  refresh-token:
+    expiration-days: 7
+
+  # Email Thread Pool
+  email:
+    thread-pool:
+      core-size: 5
+      max-size: 10
+    queue:
+      capacity: 20
+
+  # Retry / Backoff
+  retry:
+    max-attempts: 3
+    backoff-delay-ms: 100
+    backoff-multiplier: 2.0
+    max-backoff-delay-ms: 5000
+
+  # Rate Limiting (Bucket4j)
+  rate-limit:
+    enabled: true
+    distributed: ${RATE_LIMIT_DISTRIBUTED:false}
+    trusted-proxies: []
+    defaults:
+      capacity: 10
+      refill-tokens: 10
+      refill-period: 1m
+    endpoints:
+      auth-login:
+        capacity: 5
+        refill-tokens: 5
+        refill-period: 1m
+      auth:
+        capacity: 10
+        refill-tokens: 10
+        refill-period: 1m
+      products:
+        capacity: 30
+        refill-tokens: 30
+        refill-period: 1m
+      orders:
+        capacity: 20
+        refill-tokens: 20
+        refill-period: 1m
+      admin:
+        capacity: 15
+        refill-tokens: 15
+        refill-period: 1m
+
+  # Pagination
+  pagination:
+    default-page-size: 20
+
+  # JWT Security
+  jwt:
+    min-secret-length: 32
+
+# Resilience4j — Circuit Breaker & Retry for external dependencies (F-13)
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentApi:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        minimumNumberOfCalls: 5
+  retry:
+    instances:
+      paymentApi:
+        maxAttempts: 3
+        waitDuration: 1000ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.net.ConnectException
+          - java.net.http.HttpTimeoutException
+          - java.io.IOException
+
+# Actuator
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      status:
+        http-mapping:
+          UP: 200
+          DOWN: 503
+          OUT_OF_SERVICE: 503
+          UNKNOWN: 200
+  info:
+    env:
+      enabled: true
+  health:
+    status:
+      order: DOWN,OUT_OF_SERVICE,UP,UNKNOWN
+
+  # Micrometer Tracing (OpenTelemetry) — distributed tracing
+  # Enabled per profile (dev=off, staging=sampled, prod=full)
+  tracing:
+    enabled: false
+    sampling:
+      probability: 0.1
+
+# Application info
+info:
+  application:
+    name: oms
+    version: "@project.version@"
+    java-version: "@java.version@"

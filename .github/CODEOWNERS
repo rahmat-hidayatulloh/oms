@@ -1,0 +1,26 @@
+# CODEOWNERS — OMS
+# These owners will be automatically requested for review
+# when a pull request modifies matching files.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: all changes require review from at least one code owner
+*                               @oms-team
+
+# CI/CD and infrastructure
+.github/                        @oms-team-devops
+k8s/                            @oms-team-devops
+Dockerfile                      @oms-team-devops
+
+# Security-sensitive files
+src/main/java/com/oms/config/SecurityFilterChainConfig.java  @oms-team-security
+src/main/java/com/oms/config/SecurityCorsConfig.java          @oms-team-security
+src/main/java/com/oms/config/CorsProperties.java              @oms-team-security
+src/main/java/com/oms/security/                                @oms-team-security
+src/main/resources/application-prod.yml                        @oms-team-security
+
+# Database migrations
+src/main/resources/db/migration/  @oms-team-backend
+
+# Documentation
+docs/                           @oms-team-lead

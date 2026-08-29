@@ -1,0 +1,41 @@
+# ============================================================
+# Documentation Quality -- OMS
+# Runs governance checks (internal link integrity + required
+# metadata block) on any PR/push that touches Markdown docs.
+# ============================================================
+name: Docs Quality
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "docs/**"
+      - "*.md"
+      - "scripts/check-docs.py"
+      - ".github/workflows/docs-quality.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "*.md"
+      - "scripts/check-docs.py"
+      - ".github/workflows/docs-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  docs-check:
+    name: Link & Metadata Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run documentation governance checks
+        run: python3 scripts/check-docs.py

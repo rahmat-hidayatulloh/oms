@@ -1,0 +1,25 @@
+# ============================================================
+# ResourceQuota — OMS namespace
+# ============================================================
+# Caps total resource consumption in the oms-system namespace.
+# Adjust limits based on cluster size and expected load.
+# ============================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: oms-quota
+  namespace: oms-system
+  labels:
+    app.kubernetes.io/name: oms
+    app.kubernetes.io/part-of: oms
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: "8Gi"
+    limits.cpu: "8"
+    limits.memory: "16Gi"
+    persistentvolumeclaims: "4"
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "10"

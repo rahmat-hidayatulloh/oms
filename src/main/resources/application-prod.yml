@@ -1,0 +1,109 @@
+spring:
+  # PostgreSQL Database (Production)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 30
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1200000
+      pool-name: OmsProdPool
+      leak-detection-threshold: 60000
+      connection-test-query: SELECT 1
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway manages the schema; Hibernate only validates it.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # Redis for production
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 2000ms
+      connect-timeout: 2000ms
+      database: ${REDIS_DATABASE:9}
+      enabled: true
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+
+  # H2 Console disabled for production
+  h2:
+    console:
+      enabled: false
+
+# JWT for production
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000}
+
+# Production logging
+logging:
+  level:
+    com.oms: WARN
+    org.springframework: ERROR
+    org.springframework.security: ERROR
+    org.hibernate: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"
+  file:
+    name: /var/log/oms/oms-prod.log
+    max-size: 50MB
+    max-history: 30
+
+# Actuator for production
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    enabled: true
+    sampling:
+      probability: 0.1  # 10% sampling — adjust based on volume and cost
+
+# Zipkin exporter endpoint (override via environment variable)
+# Default removed; must be set explicitly per environment
+tracing:
+  zipkin:
+    endpoint: ${ZIPKIN_ENDPOINT}
+
+# Application Configuration is centralized in application.yml
+# (shared across profiles).
+
+# CORS for production — production frontend domain only
+app:
+  cors:
+    allowed-origins:
+      - "https://oms.com"

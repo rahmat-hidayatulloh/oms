@@ -1,0 +1,48 @@
+{
+  "name": "OMS API - Development",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "description": "API base URL for development environment"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "default",
+      "description": "JWT Bearer token obtained from login endpoint"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "default",
+      "description": "JWT token used to obtain a new access token"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin",
+      "type": "default",
+      "description": "Admin username for authentication"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "type": "default",
+      "description": "Admin password for authentication. Fill from GitHub Actions secret ADMIN_PASSWORD before running; never commit plaintext."
+    },
+    {
+      "key": "customerUsername",
+      "value": "customer",
+      "type": "default",
+      "description": "Customer username for authentication"
+    },
+    {
+      "key": "customerPassword",
+      "value": "",
+      "type": "default",
+      "description": "Customer password for authentication. Fill from GitHub Actions secret CUSTOMER_PASSWORD before running; never commit plaintext."
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

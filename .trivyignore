@@ -1,0 +1,53 @@
+# .trivyignore — accepted/deferred vulnerabilities (Phase V3-5, 2026-08-20)
+#
+# Context: Spring Boot was bumped 3.2.5 -> 3.2.12 (the FINAL OSS release of
+# the 3.2.x line). The remaining 37 fixable CRITICAL/HIGH findings
+# (5 CRITICAL, 32 HIGH — Trivy 0.74.0 DB) in the pom.xml analysis are fixed
+# only in dependency lines bundled with Spring Boot 3.3+/3.4+
+# (Spring Framework 6.2/7.0, Spring Security 6.3+, Jackson 2.18+,
+# Tomcat 9.0.99+/10.1.40+, Netty 4.1.12x, Micrometer 1.15+).
+# The 3.2.x line is EOL and will never receive those fixes.
+#
+# Decision: defer to a dedicated Spring Boot 3.4/3.5 upgrade sprint
+# (documented in docs/history/optimalisasi-v3/06-final-report-phaseV3-5.md,
+# backlog item). The CI Trivy gate remains ENABLED and will FAIL on any NEW
+# CVE not listed below. Remove entries as the upgrade lands.
+# GHSA entry: jackson-core maxNumberLength bypass — same situation
+# (fix = 2.18.8+ / 2.21.4, only bundled with Spring Boot 3.3+/3.4+).
+GHSA-r7wm-3cxj-wff9
+CVE-2024-50379
+CVE-2024-56337
+CVE-2025-22228
+CVE-2025-22235
+CVE-2025-24813
+CVE-2025-24970
+CVE-2025-41249
+CVE-2025-48988
+CVE-2025-48989
+CVE-2025-52520
+CVE-2025-53506
+CVE-2025-55752
+CVE-2026-22732
+CVE-2026-22733
+CVE-2026-24734
+CVE-2026-24880
+CVE-2026-34483
+CVE-2026-34487
+CVE-2026-40984
+CVE-2026-41284
+CVE-2026-41293
+CVE-2026-41842
+CVE-2026-41845
+CVE-2026-41850
+CVE-2026-42198
+CVE-2026-42498
+CVE-2026-42583
+CVE-2026-43512
+CVE-2026-43513
+CVE-2026-43515
+CVE-2026-44249
+CVE-2026-45416
+CVE-2026-50010
+CVE-2026-54512
+CVE-2026-54513
+CVE-2026-59901
