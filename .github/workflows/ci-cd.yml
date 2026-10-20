@@ -192,26 +192,42 @@ jobs:
     needs: [build]
     if: github.ref == 'refs/heads/develop' && success()
     environment: oms-dev
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4.7.0
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: ${{ env.JAVA_DISTRIBUTION }}
-          cache: maven
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.10.0
 
-      - name: Build JAR
-        run: ./mvnw package -DskipTests
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6.15.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy to Development Server
-        run: |
-          echo "🚀 Deploying to Development..."
-          echo "📦 Using DB: ${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}"
-          echo "✅ Deployment to Development completed!"
+        run: bash scripts/deploy.sh
         env:
+          ENV_NAME: dev
+          OMS_IMAGE: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          SKIP_DEPLOY: ${{ vars.SKIP_DEPLOY_DEV }}
+          REQUIRE_DEPLOY: "false"
+          REDIS_DATABASE: "0"
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
@@ -220,6 +236,10 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
   # ── Deploy to Staging ──────────────────────────────────────
   deploy-staging:
@@ -257,11 +277,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Deploy to Staging Server
-        run: |
-          echo "🚀 Deploying to Staging..."
-          echo "📦 Image: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
-          echo "✅ Deployment to Staging completed!"
+        run: bash scripts/deploy.sh
         env:
+          ENV_NAME: staging
+          OMS_IMAGE: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+          SKIP_DEPLOY: ${{ vars.SKIP_DEPLOY_STAGING }}
+          REQUIRE_DEPLOY: "false"
+          REDIS_DATABASE: "1"
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
@@ -270,6 +292,10 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
   # ── Deploy to Production ───────────────────────────────────
   deploy-prod:
     name: Deploy to Production
@@ -306,11 +332,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Deploy to Production Server
-        run: |
-          echo "🚀 Deploying to Production..."
-          echo "📦 Image: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "✅ Deployment to Production completed!"
+        run: bash scripts/deploy.sh
         env:
+          ENV_NAME: prod
+          OMS_IMAGE: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          SKIP_DEPLOY: ${{ vars.SKIP_DEPLOY_PROD }}
+          REQUIRE_DEPLOY: "true"
+          REDIS_DATABASE: "2"
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
@@ -319,3 +347,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}

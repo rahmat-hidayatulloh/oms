@@ -1,15 +1,22 @@
-# docker-compose.yml — OMS (Staging / Development with external services)
+# docker-compose.yml — OMS (staging-like lengkap: app + PostgreSQL + Redis + Zipkin + mock payment)
 # ============================================================
 # Usage:
-#   cp .env.example .env      # isi nilai secret
-#   docker-compose up -d
+#   cp .env.example .env      # isi nilai secret (JANGAN pakai P@ssw0rd)
+#   unset DB_PASSWORD REDIS_PASSWORD   # pastikan tidak ada env lama yang menimpa .env
+#   docker compose up -d
 #
-# Profiles:
-#   default : app + postgres + redis (staging-like)
-#   dev     : hanya app dengan H2 in-memory (tanpa postgres/redis)
+# Services: app, postgres, redis, zipkin, mock-payment
+#   - App HTTP   : host 8088 -> container 8080
+#   - Actuator   : host 8089 -> container 8081
+#   - PostgreSQL : host 5433 -> container 5432
+#   - Redis      : host 6379 -> container 6379
+#   - Zipkin     : host 9411 -> container 9411
+#   - Mock       : host 9090 -> container 8080
 #
 # Secret wajib (set di .env atau env var sebelum run):
-#   DB_PASSWORD, JWT_SECRET, REDIS_PASSWORD, ADMIN_PASSWORD
+#   DB_PASSWORD, JWT_SECRET
+# Opsional (disarankan untuk staging/prod nyata): REDIS_PASSWORD, ADMIN_PASSWORD
+# Dokumentasi lengkap: startapp.md (gitignored)
 # ============================================================
 
 services:
@@ -19,11 +26,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: oms:latest
+    image: ${OMS_IMAGE:-oms:latest}
     container_name: oms-app
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8088:8080"      # HTTP API
+      - "8089:8081"      # Actuator (health/metrics) — host 8089 agar tidak bentrok dengan run JAR lokal
     environment:
       SPRING_PROFILES_ACTIVE: staging
       # Database
@@ -31,9 +39,9 @@ services:
       DB_PORT: 5432
       DB_NAME: omsdb_staging
       DB_USERNAME: oms_user
-      DB_PASSWORD: ${DB_PASSWORD}
-      # JWT
-      JWT_SECRET: ${JWT_SECRET}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD di .env (bukan P@ssw0rd)}
+      # JWT — WAJIB >= 32 karakter (StartupConfigGuard menolak yang pendek)
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET >= 32 karakter acak di .env}
       JWT_EXPIRATION: 3600000
       JWT_REFRESH_EXPIRATION: 604800000
       # Redis
@@ -43,9 +51,11 @@ services:
       REDIS_DATABASE: 1
       RATE_LIMIT_DISTRIBUTED: "true"
       # App
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      ERROR_BASE_URL: http://localhost:8080/errors
-      HEALTH_URL: http://localhost:9090/health
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      ERROR_BASE_URL: http://localhost:8088/errors
+      HEALTH_URL: http://mock-payment:8080/health
+      # Tracing (Zipkin) — service zipkin disediakan di bawah
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       # JVM
       JAVA_OPTS: "-XX:+UseZGC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
     depends_on:
@@ -53,6 +63,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mock-payment:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/version"]
       interval: 30s
@@ -67,6 +81,8 @@ services:
     image: postgres:16-alpine
     container_name: oms-postgres
     restart: unless-stopped
+    ports:
+      - "5433:5432"
     environment:
       POSTGRES_DB: omsdb_staging
       POSTGRES_USER: oms_user
@@ -86,18 +102,53 @@ services:
     image: redis:7-alpine
     container_name: oms-redis
     restart: unless-stopped
+    ports:
+      - "6379:6379"
+    environment:
+      # Kosongkan untuk lokal (tanpa auth); wajib diisi untuk staging/prod nyata
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-}
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+               exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru;
+             else
+               exec redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru;
+             fi'
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping; else redis-cli ping; fi"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - oms-network
+
+# ── Mock Payment API (BI-SNAP) ──────────────────────────
+  # Dipakai ExternalAPIHealthIndicator (HEALTH_URL).
+  # Menjalankan penuh di dalam compose agar tidak bergantung pada proses eksternal.
+  mock-payment:
+    image: ariefwara/mock-bi-snap
+    container_name: oms-mock-payment
+    restart: unless-stopped
+    ports:
+      - "9090:8080"      # agar run JAR lokal bisa memakai HEALTH_URL=http://localhost:9090/health
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # node server.js butuh waktu init > 60s sebelum listen di 8080
+      start_period: 120s
+    networks:
+      - oms-network
+
+  # ── Zipkin (tracing backend) ─────────────────────────────
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: oms-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
     networks:
       - oms-network
 

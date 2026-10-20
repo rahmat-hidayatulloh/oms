@@ -120,3 +120,9 @@ temp/
 ehthumbs.db
 *.lnk
 desktop.ini
+
+# ============================
+# Security — dokumen lokal yang berisi nilai secret environment
+# (startapp.md berisi seluruh env value dev/staging/prod; JANGAN commit)
+# ============================
+startapp.md

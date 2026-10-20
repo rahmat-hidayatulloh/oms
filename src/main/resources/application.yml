@@ -197,3 +197,13 @@ info:
     name: oms
     version: "@project.version@"
     java-version: "@java.version@"
+
+# OpenAPI / Swagger (springdoc)
+# Arahkan Swagger UI ke spec API OMS (/v3/api-docs) alih-alih contoh Petstore
+# bawaan dari Swagger UI webjar (springdoc-openapi-starter-webmvc-ui).
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /v3/api-docs

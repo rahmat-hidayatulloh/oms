@@ -59,9 +59,18 @@ public class TracingConfig {
 
     /**
      * Creates the Zipkin span exporter that sends trace data to a Zipkin-compatible backend.
+     *
+     * <p>
+     * Return type is the concrete {@link ZipkinSpanExporter} (not the {@code SpanExporter}
+     * interface) on purpose: Spring Boot Actuator's
+     * {@code ZipkinConfigurations.OpenTelemetryConfiguration} registers its own
+     * {@code zipkinSpanExporter} bean guarded by {@code @ConditionalOnMissingBean} matched
+     * by type. Declaring the concrete type makes the auto-configuration back off cleanly;
+     * declaring only the interface caused a {@code BeanDefinitionOverrideException}
+     * (duplicate bean name) on staging/prod where tracing is enabled.
      */
     @Bean
-    public SpanExporter zipkinSpanExporter() {
+    public ZipkinSpanExporter zipkinSpanExporter() {
         return ZipkinSpanExporter.builder()
                 .setEndpoint(zipkinEndpoint)
                 .build();
