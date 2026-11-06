@@ -17,6 +17,8 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
 
+import com.oms.config.PaymentApiProperties;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -26,6 +28,11 @@ import lombok.extern.slf4j.Slf4j;
  * (F-13). Uses programmatic decoration because
  * {@link HealthIndicator#health()} cannot throw checked exceptions,
  * which is required for annotation-based Resilience4j AOP.
+ * <p>
+ * The external API base URL and health path are externalized through
+ * {@link PaymentApiProperties} ({@code app.payment.api.base-url} +
+ * {@code app.payment.api.health-path}) instead of inline {@code @Value}
+ * annotations, making the URL environment-aware (12-Factor).
  */
 @Slf4j
 @Component
@@ -48,11 +55,11 @@ public class ExternalAPIHealthIndicator implements HealthIndicator {
 
     // V4-02: constructor injection instead of field-level @Value.
     public ExternalAPIHealthIndicator(
-            @Value("${app.payment.api.health-url:http://localhost:9090/health}") String paymentApiHealthUrl,
+            PaymentApiProperties paymentApiProperties,
             @Value("${app.health-check.timeout:5s}") Duration healthCheckTimeout,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry) {
-        this.paymentApiHealthUrl = paymentApiHealthUrl;
+        this.paymentApiHealthUrl = paymentApiProperties.getHealthUrl();
         this.healthCheckTimeout = healthCheckTimeout;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.retryRegistry = retryRegistry;

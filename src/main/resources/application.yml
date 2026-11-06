@@ -63,12 +63,20 @@ logging:
 
 # Application Configuration
 app:
-  # Health Check
+  # External payment API (health check + future client calls).
+  # The URL is built from an environment-specific base URL plus the health
+  # path, so only PAYMENT_API_BASE_URL has to change per environment:
+  #   dev (host)              -> http://localhost:9090   (docker-compose port mapping)
+  #   docker-compose/minikube -> http://mock-payment:8080 (compose service DNS)
+  # HEALTH_URL is still honoured as a full-URL override for backward
+  # compatibility with existing deployments/scripts.
   payment:
     api:
-      health-url: ${HEALTH_URL:http://localhost:9090/health}
+      base-url: ${PAYMENT_API_BASE_URL:http://localhost:9090}
+      health-path: ${PAYMENT_API_HEALTH_PATH:/health}
+      health-url: ${HEALTH_URL:}
   health-check:
-    timeout: 5s
+    timeout: ${HEALTH_CHECK_TIMEOUT:5s}
 
   # Error / RFC 7807 ProblemDetail
   error:

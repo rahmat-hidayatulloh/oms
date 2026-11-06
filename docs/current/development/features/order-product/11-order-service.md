@@ -108,3 +108,37 @@ rujuk `docs/history/` untuk snapshot per versi.
 - `RetryTemplate` (programmatik, dari `RetryConfig`) di-inject ke `OrderService` untuk retry pada `OptimisticLockException` (backoff: 100ms–5s, max 3 attempts).
 - `Micrometer` Counter + Timer (`orderCreatedCounter`, `orderFailedCounter`, `orderProcessingTimer`) dilaporkan ke Prometheus via Actuator.
 - `BigDecimal` dipakai untuk perhitungan total agar presisi uang terjaga.
+
+### 8. Approve Order (Status Transition)
+
+`approve(UUID id)` memindahkan order dari `PENDING` ke `PAID`. Endpoint:
+
+```http
+POST /api/v1/orders/{id}/approve
+Authorization: Bearer <jwt-token>   # role ADMIN
+```
+
+Alur `approve`:
+1. `findByIdWithItems(id)` — jika order tidak ada, throw `ResourceNotFoundException` (→ `404`).
+2. Guard status: hanya `PENDING` → `PAID` yang diizinkan. Jika status bukan `PENDING`, throw `InvalidStatusTransitionException` (→ `409 Conflict`, `ErrorCode.INVALID_STATUS_TRANSITION`).
+3. `order.setStatus(PAID)` lalu `orderRepository.save(order)` dan kembalikan `OrderResponse`.
+
+#### Role & Keamanan
+- Endpoint di-guard dengan `@PreAuthorize("hasRole('ADMIN')")`.
+- Non-admin yang terautentikasi → `403 Forbidden` (ditangani `SecurityExceptionHandler`).
+- Tidak terautentikasi → `401/403` oleh filter chain.
+
+#### Status Flow
+```
+PENDING --approve--> PAID
+```
+
+#### Catatan Caching
+Order **tidak** di-cache (hanya `Product` yang di-cache via Redis). Karena itu `approve` tidak memerlukan `@CacheEvict` — perubahan status langsung terlihat tanpa invalidasi cache.
+
+#### Exception Baru
+- `InvalidStatusTransitionException` (package `com.oms.exception`) — dipetakan ke `ErrorCode.INVALID_STATUS_TRANSITION` (HTTP 409) oleh `BusinessExceptionHandler`.
+
+#### Unit Test (OrderControllerTest)
+- ✅ `approveOrder_adminShouldReturn200WithPaidStatus` — admin approve → `200` + status `PAID`
+- ✅ `approveOrder_nonPendingOrderShouldThrowInvalidStatusTransition` — status bukan `PENDING` → `InvalidStatusTransitionException`

@@ -134,4 +134,24 @@ public class OrderController {
         orderService.deleteForUser(id, username, isAdmin);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(
+        summary = "Approve an order",
+        description = "Transitions a PENDING order to PAID. ADMIN role only.",
+        security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Order approved",
+            content = @Content(schema = @Schema(implementation = OrderResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN only"),
+        @ApiResponse(responseCode = "404", description = "Order not found"),
+        @ApiResponse(responseCode = "409", description = "Invalid status transition - order not PENDING")
+    })
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderResponse> approveOrder(
+        @Parameter(description = "Order UUID", required = true)
+        @PathVariable UUID id) {
+        return ResponseEntity.ok(orderService.approve(id));
+    }
 }

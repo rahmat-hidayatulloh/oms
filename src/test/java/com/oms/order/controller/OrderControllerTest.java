@@ -5,6 +5,7 @@ import com.oms.order.dto.OrderResponse;
 import com.oms.order.entity.OrderStatus;
 import com.oms.order.OrderConstants;
 import com.oms.exception.ResourceNotFoundException;
+import com.oms.exception.InvalidStatusTransitionException;
 import com.oms.order.service.OrderServiceInterface;
 
 import org.junit.jupiter.api.Test;
@@ -143,6 +144,40 @@ class OrderControllerTest {
                 orderController.deleteOrder(orderId);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void approveOrder_adminShouldReturn200WithPaidStatus() {
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        setupAuthentication("admin", "ROLE_ADMIN");
+
+        OrderResponse approved = new OrderResponse(
+                orderId, "ORD-001", userId,
+                new BigDecimal("100000.00"), OrderStatus.PAID,
+                Collections.emptyList(), null, null);
+        when(orderService.approve(eq(orderId))).thenReturn(approved);
+
+        ResponseEntity<OrderResponse> result =
+                orderController.approveOrder(orderId);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody()).isNotNull();
+        assertThat(result.getBody().status()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    void approveOrder_nonPendingOrderShouldThrowInvalidStatusTransition() {
+        UUID orderId = UUID.randomUUID();
+        setupAuthentication("admin", "ROLE_ADMIN");
+
+        when(orderService.approve(eq(orderId)))
+                .thenThrow(new InvalidStatusTransitionException(
+                        "Order " + orderId + " cannot be approved from status SHIPPED"));
+
+        assertThatThrownBy(() -> orderController.approveOrder(orderId))
+                .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
     private void setupAuthentication(String username, String role) {

@@ -41,4 +41,17 @@ public interface OrderServiceInterface {
      * @param isAdmin  whether the user has ADMIN role
      */
     void deleteForUser(UUID id, String username, boolean isAdmin);
+
+    /**
+     * Approves a pending order, transitioning it from {@code PENDING} to
+     * {@code PAID}. ADMIN role only (enforced at the controller/security layer).
+     * <p>
+     * The transition is guarded: only orders in {@code PENDING} state may be
+     * approved. Any other state raises an {@code INVALID_STATUS_TRANSITION}
+     * business error (HTTP 409 Conflict).
+     *
+     * @param id the order ID to approve
+     * @return the updated order response
+     */
+    OrderResponse approve(UUID id);
 }

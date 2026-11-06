@@ -18,6 +18,7 @@ import com.oms.order.repository.OrderRepository;
 import com.oms.auth.repository.UserRepository;
 import com.oms.order.OrderConstants;
 import com.oms.exception.ResourceNotFoundException;
+import com.oms.exception.InvalidStatusTransitionException;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -180,6 +181,25 @@ public class OrderService implements OrderServiceInterface {
 
         orderRepository.deleteById(id);
         log.info("Soft-deleted order {} by user '{}'", id, username);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse approve(UUID id) {
+        Order order = orderRepository.findByIdWithItems(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        OrderConstants.ENTITY_ORDER, "id", id));
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new InvalidStatusTransitionException(
+                    "Order " + id + " cannot be approved from status "
+                            + order.getStatus() + "; only PENDING orders can be approved");
+        }
+
+        order.setStatus(OrderStatus.PAID);
+        Order saved = orderRepository.save(order);
+        log.info("Approved order {} (status {} -> {})", id, OrderStatus.PENDING, OrderStatus.PAID);
+        return toResponse(saved);
     }
 
     private String generateOrderNumber() {

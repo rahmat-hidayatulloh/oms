@@ -69,6 +69,9 @@ logs/
 # ============================
 env/*.properties
 !env/*.example.properties
+# env/*.env berisi nilai secret real (JWT_SECRET, DB_PASSWORD, ADMIN_PASSWORD,
+# dst.) per environment — JANGAN commit. Distribusi hanya via dist/oms-env-secrets.zip.
+env/*.env
 .env
 .env.local
 .env.*.local

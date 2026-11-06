@@ -145,6 +145,23 @@ Authorization: Bearer <jwt-token>
 
 **Response:** `204 No Content`
 
+### Approve Order
+
+```http
+POST /api/v1/orders/{id}/approve
+Authorization: Bearer <jwt-token>
+```
+
+**Auth:** `ADMIN` only (non-admin → `403 Forbidden`)
+
+Transitions a `PENDING` order to `PAID`.
+
+**Response:** `200 OK` — Returns `OrderResponse` with `status: "PAID"`
+
+**Errors:**
+- `404 Not Found` — order does not exist
+- `409 Conflict` — order is not `PENDING` (invalid status transition)
+
 ---
 
 ## Product Management
@@ -329,6 +346,7 @@ All errors follow RFC 7807 ProblemDetail format:
 | 401 | Unauthorized | Missing or invalid authentication |
 | 403 | Forbidden | Insufficient permissions |
 | 404 | Not Found | Resource not found |
+| 409 | Conflict | Invalid status transition (e.g. approving a non-PENDING order) |
 | 429 | Too Many Requests | Rate limit exceeded |
 | 500 | Internal Server Error | Server error |
 

@@ -19,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.actuate.health.Health;
 
+import com.oms.config.PaymentApiProperties;
+
 /**
  * Tests error paths in {@link ExternalAPIHealthIndicator} using Mockito.
  */
@@ -45,7 +47,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -76,7 +78,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -105,7 +107,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -131,7 +133,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -158,7 +160,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -184,7 +186,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -213,7 +215,7 @@ class ExternalAPIHealthIndicatorErrorTest {
 
         ExternalAPIHealthIndicator indicator =
             new ExternalAPIHealthIndicator(
-                "http://localhost:9090/health",
+                buildProperties(),
                 java.time.Duration.ofSeconds(5),
                 cbRegistry, retryRegistry);
         setField(indicator, "httpClient", httpClient);
@@ -223,6 +225,12 @@ class ExternalAPIHealthIndicatorErrorTest {
         assertThat(health.getDetails())
             .containsEntry("url",
                 "http://localhost:9090/health");
+    }
+
+    private PaymentApiProperties buildProperties() {
+        PaymentApiProperties props = new PaymentApiProperties();
+        props.setHealthUrl("http://localhost:9090/health");
+        return props;
     }
 
     private void setField(Object obj, String fieldName,

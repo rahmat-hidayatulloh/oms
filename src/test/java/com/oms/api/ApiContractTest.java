@@ -39,6 +39,7 @@ class ApiContractTest {
             "GET /api/v1/orders",
             "GET /api/v1/orders/{id}",
             "DELETE /api/v1/orders/{id}",
+            "POST /api/v1/orders/{id}/approve",
             "POST /api/v1/products",
             "GET /api/v1/products",
             "GET /api/v1/products/{id}",

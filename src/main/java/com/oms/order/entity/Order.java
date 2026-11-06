@@ -84,4 +84,14 @@ public class Order extends BaseEntity {
         orderItems.remove(orderItem);
         orderItem.setOrder(null);
     }
+
+    /**
+     * Updates the order status. Used by the approval flow
+     * ({@code PENDING -> PAID}) and any future status transitions.
+     *
+     * @param status the new status
+     */
+    public void setStatus(OrderStatus status) {
+        this.status = status;
+    }
 }

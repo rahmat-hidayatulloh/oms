@@ -32,6 +32,20 @@ jwt:
   secret: test-secret-key-for-unit-testing-purposes-only-minimum-length
   expiration: 3600000
 
+app:
+  # RFC 7807 ProblemDetail — pinned for the test profile so that assertions on
+  # the `type` field stay hermetic and are not influenced by a developer shell
+  # that exported ERROR_BASE_URL (see env/*.env) before running the build.
+  error:
+    base-url: https://api.oms.com/errors
+
+  # External payment API — pinned so the health indicator does not depend on
+  # a developer-supplied HEALTH_URL.
+  payment:
+    api:
+      base-url: http://localhost:9090
+      health-path: /health
+
 # Resilience4j test defaults
 resilience4j:
   circuitbreaker:

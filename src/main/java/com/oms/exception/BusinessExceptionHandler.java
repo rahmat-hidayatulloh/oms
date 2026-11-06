@@ -34,6 +34,12 @@ public class BusinessExceptionHandler extends BaseExceptionHandler {
         return build(ErrorCode.BUSINESS_ERROR, ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidStatusTransitionException.class)
+    public ProblemDetail handleInvalidStatusTransition(InvalidStatusTransitionException ex) {
+        log.warn("Invalid status transition: {}", ex.getMessage());
+        return build(ErrorCode.INVALID_STATUS_TRANSITION, ex.getMessage());
+    }
+
     @ExceptionHandler(NoHandlerFoundException.class)
     public ProblemDetail handleNoHandlerFound(NoHandlerFoundException ex) {
         log.warn("No handler found: {}", ex.getMessage());

@@ -33,6 +33,7 @@ public enum ErrorCode {
     NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "Not Acceptable"),
     CONFLICT(HttpStatus.CONFLICT, "Resource Conflict"),
     CONCURRENCY_CONFLICT(HttpStatus.CONFLICT, "Concurrent Modification"),
+    INVALID_STATUS_TRANSITION(HttpStatus.CONFLICT, "Invalid Status Transition"),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type"),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable"),
