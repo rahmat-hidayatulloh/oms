@@ -3,7 +3,7 @@
 > **Status:** Current
 > **Audience:** Developer
 > **Owner:** Engineering
-> **Last verified:** 2026-08-28 (screening kode aktual `src/`, `pom.xml`)
+> **Last verified:** 2026-11-06 (screening kode aktual `src/`, `pom.xml`)
 > **Source of truth:** Repository source code (`src/`), `pom.xml`, dan konfigurasi runtime
 
 ## 📋 Deskripsi
@@ -126,13 +126,23 @@ public class RedisConfig {
 
     private final Duration cacheTtl; // @Value("${spring.data.redis.cache.ttl:3600}")
 
+    // Shared mapper — internal field, BUKAN @Bean (lihat bagian 5)
+    private final ObjectMapper redisObjectMapper;
+
     // V4-02: constructor injection (bukan field-level @Value)
-    public RedisConfig(@Value("${spring.data.redis.cache.ttl:3600}") Duration cacheTtl) {
+    public RedisConfig(
+            @Value("${spring.data.redis.host:localhost}") String redisHost,
+            @Value("${spring.data.redis.port:6379}") int redisPort,
+            @Value("${spring.data.redis.database:0}") int redisDatabase,
+            @Value("${spring.data.redis.password:}") String redisPassword,
+            @Value("${spring.data.redis.cache.ttl:3600}") Duration cacheTtl) {
+        /* ... assign host/port/database/password ... */
         this.cacheTtl = cacheTtl;
+        this.redisObjectMapper = createRedisObjectMapper();
     }
 
     @Bean
-    public RedisCacheConfiguration cacheConfiguration(ObjectMapper redisObjectMapper) {
+    public RedisCacheConfiguration cacheConfiguration() {
         GenericJackson2JsonRedisSerializer jsonSerializer =
                 new GenericJackson2JsonRedisSerializer(redisObjectMapper);
         StringRedisSerializer stringSerializer = new StringRedisSerializer();
@@ -175,8 +185,7 @@ public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory,
 
 ```java
 @Bean
-public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory,
-                                                   ObjectMapper redisObjectMapper) {
+public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
     RedisTemplate<String, Object> template = new RedisTemplate<>();
     template.setConnectionFactory(connectionFactory);
 
@@ -196,9 +205,11 @@ public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connec
 ```
 
 **ObjectMapper khusus (`redisObjectMapper`):**
+- **Bukan `@Bean`.** Mapper ini disimpan sebagai `private final` field dan dibuat sekali lewat `createRedisObjectMapper()`, lalu dipakai bersama oleh `redisTemplate(...)` dan `cacheConfiguration()`. Kalau diekspos sebagai bean `ObjectMapper`, ia akan menjadi **satu-satunya** `ObjectMapper` di context saat Redis aktif (staging/prod) → `JacksonAutoConfiguration` back-off → seluruh JSON MVC rusak (request `BigDecimal`/`List` ditolak 400, respons dibungkus type-id). Accessor `redisObjectMapper()` hanya factory method biasa (dipakai unit test).
 - `registerModule(new JavaTimeModule())` — agar `LocalDateTime` dapat diserialisasi (bukan error `InvalidDefinitionException`)
 - `disable(WRITE_DATES_AS_TIMESTAMPS)` — tanggal diserialisasi sebagai ISO-8601 string, bukan epoch timestamp
-- `activateDefaultTyping(BasicPolymorphicTypeValidator, DefaultTyping.NON_FINAL)` — menambahkan metadata tipe (`@class`) untuk deserialisasi type-safe, dengan whitelist subtype `com.oms.*`, `java.util.*`, `java.lang.*` (menangkal deserialization arbitrary class / F-11)
+- `activateDefaultTyping(BasicPolymorphicTypeValidator, DefaultTyping.EVERYTHING)` — menambahkan metadata tipe untuk deserialisasi type-safe. **Harus `EVERYTHING`, bukan `NON_FINAL`**: nilai cache adalah `record` (`ProductResponse`, `OrderResponse`) yang bersifat final, dan `NON_FINAL` tidak menulis type-id untuk tipe final sehingga cache read gagal (`need Array value to contain As.WRAPPER_ARRAY type information`).
+- Whitelist subtype: `com.oms.*`, `java.util.*`, `java.lang.*`, `java.math.*` (BigDecimal/BigInteger), `java.time.*` — menangkal deserialization arbitrary class (F-11) sekaligus tetap bisa membaca tipe nilai yang dipakai DTO cache.
 
 **Serialization Strategy:**
 - **Keys:** `StringRedisSerializer` — Human-readable, compact

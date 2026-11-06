@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -52,13 +53,34 @@ class OrderControllerTest {
                 UUID.randomUUID(), "ORD-001", userId,
                 new BigDecimal("100000.00"), OrderStatus.PENDING,
                 Collections.emptyList(), null, null);
-        when(orderService.createOrder(any(OrderRequest.class), any())).thenReturn(response);
+        when(orderService.createOrderForUser(any(OrderRequest.class), any()))
+                .thenReturn(response);
 
         ResponseEntity<OrderResponse> result = orderController.createOrder(request);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(result.getBody()).isNotNull();
         assertThat(result.getBody().orderNumber()).isEqualTo("ORD-001");
+    }
+
+    @Test
+    void createOrder_shouldPassAuthenticatedUsernameToService() {
+        // Regression: the controller used to pass UUID.randomUUID() as the
+        // owner, so orders were never owned by the caller (GET/DELETE by the
+        // owner returned 404). It must forward the authenticated username.
+        setupAuthentication("testuser", "ROLE_CUSTOMER");
+
+        OrderRequest request = new OrderRequest(Collections.emptyList());
+        OrderResponse response = new OrderResponse(
+                UUID.randomUUID(), "ORD-002", UUID.randomUUID(),
+                new BigDecimal("1000.00"), OrderStatus.PENDING,
+                Collections.emptyList(), null, null);
+        when(orderService.createOrderForUser(any(OrderRequest.class), eq("testuser")))
+                .thenReturn(response);
+
+        orderController.createOrder(request);
+
+        verify(orderService).createOrderForUser(any(OrderRequest.class), eq("testuser"));
     }
 
     @Test

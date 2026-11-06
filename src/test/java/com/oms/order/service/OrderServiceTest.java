@@ -23,6 +23,7 @@ import com.oms.order.entity.OrderItem;
 import com.oms.exception.BadRequestException;
 import com.oms.exception.ResourceNotFoundException;
 import com.oms.order.repository.OrderRepository;
+import com.oms.auth.entity.User;
 import com.oms.auth.repository.UserRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -100,6 +101,29 @@ class OrderServiceTest {
                 .quantity(quantity)
                 .price(price)
                 .build();
+    }
+
+    @Test
+    void createOrderForUser_shouldResolveUserIdFromUsername() {
+        // Regression: orders must belong to the authenticated user, otherwise
+        // GET/DELETE by the owner returns 404 (IDOR check fails).
+        UUID userId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        OrderItem item = sampleOrderItem(productId, "Buku Tulis", 2,
+                new BigDecimal("15000.00"));
+        OrderRequest request = new OrderRequest(
+                List.of(new OrderItemRequest(productId, 2)));
+        User user = User.builder().id(userId).username("buyer").build();
+
+        when(userRepository.findByUsername("buyer")).thenReturn(Optional.of(user));
+        when(orderItemFactory.buildAndValidateItems(anyList())).thenReturn(List.of(item));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        OrderResponse response = orderService.createOrderForUser(request, "buyer");
+
+        assertEquals(userId, response.userId());
+        verify(userRepository).findByUsername("buyer");
     }
 
     @Test

@@ -15,6 +15,17 @@ public interface OrderServiceInterface {
 
     OrderResponse createOrder(OrderRequest request, UUID userId);
 
+    /**
+     * Creates an order for the authenticated user, resolving the user id from
+     * the username carried by the security principal. Keeps the controller thin
+     * while guaranteeing the created order is owned by the caller (IDOR-safe).
+     *
+     * @param request  the order request
+     * @param username the authenticated user's username
+     * @return the created order
+     */
+    OrderResponse createOrderForUser(OrderRequest request, String username);
+
     OrderResponse findById(UUID id);
 
     /**

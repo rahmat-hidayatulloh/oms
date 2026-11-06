@@ -36,6 +36,18 @@ public class RedisConfig {
     private final String redisPassword;
     private final Duration cacheTtl;
 
+    /**
+     * Internal ObjectMapper for Redis serialization only — deliberately NOT a
+     * Spring bean. Exposing it as a bean would make it the sole
+     * {@code ObjectMapper} in the context whenever Redis is enabled
+     * (staging/prod), which would stop Spring Boot's {@code JacksonAutoConfiguration}
+     * and leak the default-typing mode into every MVC HTTP request/response
+     * (breaking any body containing non-final types like {@code BigDecimal}
+     * or {@code List}). Kept as an instance field so {@link #redisTemplate}
+     * and {@link #cacheConfiguration} share one identical instance (F-18).
+     */
+    private final ObjectMapper redisObjectMapper;
+
     // V4-02: constructor injection instead of field-level @Value.
     public RedisConfig(
             @Value("${spring.data.redis.host:localhost}") String redisHost,
@@ -48,17 +60,28 @@ public class RedisConfig {
         this.redisDatabase = redisDatabase;
         this.redisPassword = redisPassword;
         this.cacheTtl = cacheTtl;
+        this.redisObjectMapper = createRedisObjectMapper();
     }
 
     /**
      * Shared {@link ObjectMapper} for Redis serialization.
      * <p>
-     * Uses {@link BasicPolymorphicTypeValidator} with a whitelist that only allows
-     * {@code com.oms.*} types, preventing deserialization of arbitrary classes
+     * Uses {@link BasicPolymorphicTypeValidator} with an explicit whitelist
+     * ({@code com.oms.*}, {@code java.util.*}, {@code java.lang.*},
+     * {@code java.math.*}, {@code java.time.*}) so only known DTO/value types
+     * can be deserialized, preventing arbitrary-class deserialization
      * (fixes F-11 / DefaultTyping vulnerability).
+     * <p>
+     * Returns the shared internal instance — this is a plain factory method used
+     * by {@link #redisTemplate} and {@link #cacheConfiguration} (and kept public
+     * for unit tests); it is not registered as an {@code ObjectMapper} bean so
+     * the MVC layer keeps Spring Boot's default ObjectMapper.
      */
-    @Bean
     public ObjectMapper redisObjectMapper() {
+        return redisObjectMapper;
+    }
+
+    private static ObjectMapper createRedisObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -67,8 +90,19 @@ public class RedisConfig {
                 .allowIfSubType("com.oms.")
                 .allowIfSubType("java.util.")
                 .allowIfSubType("java.lang.")
+                // Value types used by cached DTOs. BigDecimal/BigInteger are
+                // non-final, so default typing writes their type ids
+                // (e.g. ["java.math.BigDecimal", 25000.00]); without these the
+                // deserializer would reject every @Cacheable read.
+                .allowIfSubType("java.math.")
+                .allowIfSubType("java.time.")
                 .build(),
-            ObjectMapper.DefaultTyping.NON_FINAL
+            // EVERYTHING (not NON_FINAL): cached values are java records
+            // (ProductResponse/OrderResponse), which are final classes. With
+            // NON_FINAL Jackson writes no type id for them, so the cache read
+            // fails with "need Array value to contain As.WRAPPER_ARRAY type
+            // information". EVERYTHING emits type ids for final types too.
+            ObjectMapper.DefaultTyping.EVERYTHING
         );
         return mapper;
     }
@@ -85,8 +119,7 @@ public class RedisConfig {
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(
-            RedisConnectionFactory connectionFactory,
-            ObjectMapper redisObjectMapper) {
+            RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
@@ -104,7 +137,7 @@ public class RedisConfig {
     }
 
     @Bean
-    public RedisCacheConfiguration cacheConfiguration(ObjectMapper redisObjectMapper) {
+    public RedisCacheConfiguration cacheConfiguration() {
         GenericJackson2JsonRedisSerializer jsonSerializer =
             new GenericJackson2JsonRedisSerializer(redisObjectMapper);
         StringRedisSerializer stringSerializer = new StringRedisSerializer();

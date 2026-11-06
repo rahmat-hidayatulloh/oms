@@ -128,4 +128,9 @@ desktop.ini
 # Security — dokumen lokal yang berisi nilai secret environment
 # (startapp.md berisi seluruh env value dev/staging/prod; JANGAN commit)
 # ============================
+
+# ============================
+# Catatan pribadi / chat history lokal (JANGAN commit)
+# ============================
+catatan-pribadi/
 startapp.md

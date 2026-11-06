@@ -69,6 +69,23 @@ Alur `doCreateOrder`:
 
 > **Penting:** `OrderItemFactory` bertanggung jawab atas validasi & pengurangan stock, termasuk `productRepository.saveAll(products)`. `OrderService.createOrder` tidak perlu memanggil `OrderItemRepository` secara eksplisit karena cascade ALL sudah menanganinya.
 
+#### Resolusi owner order (wajib)
+
+`OrderController.createOrder` **tidak boleh** mengarang `userId`. Ia mengambil principal dari `SecurityContextHolder` dan memanggil `createOrderForUser(request, username)`; service memetakan username → `User.id` lewat `userRepository.findByUsername(...)` lalu mendelegasikan ke `createOrder(request, userId)`:
+
+```java
+@Override
+public OrderResponse createOrderForUser(OrderRequest request, String username) {
+    UUID userId = userRepository.findByUsername(username)
+            .map(User::getId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                    OrderConstants.ENTITY_USER, "username", username));
+    return createOrder(request, userId);
+}
+```
+
+> **Kenapa:** versi lama controller memakai `UUID.randomUUID()` sebagai owner, sehingga `orders.user_id` tidak pernah sama dengan user pembuatnya — `GET /api/v1/orders/{id}` dan `DELETE /api/v1/orders/{id}` oleh owner selalu `404` (IDOR check gagal) dan lookup email untuk `OrderCreatedEvent` selalu jatuh ke fallback. Regression test: `OrderControllerTest#createOrder_shouldPassAuthenticatedUsernameToService`, `OrderServiceTest#createOrderForUser_shouldResolveUserIdFromUsername`.
+
 ### 3. Generate Order Number
 
 Format: `OMS-YYYYMMDD-XXXXXXXX`

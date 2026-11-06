@@ -83,6 +83,15 @@ public class OrderService implements OrderServiceInterface {
 
     }
 
+    @Override
+    public OrderResponse createOrderForUser(OrderRequest request, String username) {
+        UUID userId = userRepository.findByUsername(username)
+                .map(User::getId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        OrderConstants.ENTITY_USER, "username", username));
+        return createOrder(request, userId);
+    }
+
     private OrderResponse doCreateOrder(OrderRequest request, UUID userId) {
         List<OrderItem> orderItems = orderItemFactory.buildAndValidateItems(request.items());
 

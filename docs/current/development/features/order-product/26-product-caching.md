@@ -15,7 +15,7 @@ Dokumen ini menjelaskan implementasi caching berbasis Redis untuk data produk pa
 - Cache manager: `RedisCacheManager` (dari `RedisConfig`; cache name terbentuk otomatis saat pertama kali dipakai)
 - TTL: **global** via `spring.data.redis.cache.ttl` (default `3600` detik / 1 jam) melalui `RedisCacheConfiguration.entryTtl(...)` — **tidak ada** override TTL per-cache
 - Key serialization: `StringRedisSerializer`
-- Value serialization: `GenericJackson2JsonRedisSerializer` + `ObjectMapper` khusus (JavaTimeModule, default-typing whitelist `com.oms.*`)
+- Value serialization: `GenericJackson2JsonRedisSerializer` + `ObjectMapper` internal (`RedisConfig#createRedisObjectMapper`, **bukan bean** agar tidak membajak MVC JSON) — JavaTimeModule, `DefaultTyping.EVERYTHING`, whitelist `com.oms.*`, `java.util.*`, `java.lang.*`, `java.math.*`, `java.time.*`
 - Null values: `disableCachingNullValues()` — nilai `null` tidak pernah disimpan
 - Prefix pemisah key Redis default Spring: `::` (contoh `products::{id}`, `products_list::all`)
 - Nama cache didefinisikan di `CacheConstants`: `CACHE_PRODUCTS = "products"`, `CACHE_PRODUCTS_LIST = "products_list"`
@@ -43,8 +43,9 @@ Dokumen ini menjelaskan implementasi caching berbasis Redis untuk data produk pa
 
 | Issue | Status |
 |-------|--------|
-| `LocalDateTime`/`BigDecimal` tidak ter-serialize dengan benar | ✅ **Resolved** — `ObjectMapper` mendaftarkan `JavaTimeModule` dan men-disable `WRITE_DATES_AS_TIMESTAMPS` |
-| `ClassCastException` saat retrieve object hasil cache | ✅ **Resolved** — `GenericJackson2JsonRedisSerializer(redisObjectMapper)` + `BasicPolymorphicTypeValidator` whitelist `com.oms.*` |
+| `LocalDateTime`/`BigDecimal` tidak ter-serialize dengan benar | ✅ **Resolved** — `ObjectMapper` mendaftarkan `JavaTimeModule`, men-disable `WRITE_DATES_AS_TIMESTAMPS`, dan whitelist memuat `java.math.*` (BigDecimal non-final menulis type-id) |
+| `ClassCastException` saat retrieve object hasil cache | ✅ **Resolved** — `GenericJackson2JsonRedisSerializer(redisObjectMapper)` + `DefaultTyping.EVERYTHING` (record DTO bersifat final; `NON_FINAL` tak menulis type-id) |
+| Seluruh JSON API rusak saat Redis aktif (400 pada body `BigDecimal`/`List`, respons ber-type-id) | ✅ **Resolved (06 Nov 2026)** — mapper Redis tidak lagi diekspos sebagai `@Bean`; `JacksonAutoConfiguration` kembali menyediakan `ObjectMapper` standar untuk MVC |
 | TTL berbeda per cache name | ❌ Tidak diimplementasikan — TTL global (1 jam) |
 
 ## Next Steps

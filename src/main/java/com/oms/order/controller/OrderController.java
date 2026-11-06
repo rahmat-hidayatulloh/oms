@@ -65,9 +65,10 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     public ResponseEntity<OrderResponse> createOrder(
         @Valid @RequestBody OrderRequest request) {
-        // userId resolution is handled by the service to keep controllers thin
-        OrderResponse order = orderService.createOrder(
-                request, UUID.randomUUID());
+        // Resolve the caller from the security context; the service maps the
+        // username to a user id so the order is owned by the authenticated user.
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        OrderResponse order = orderService.createOrderForUser(request, auth.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 
