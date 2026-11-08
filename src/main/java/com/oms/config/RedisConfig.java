@@ -54,7 +54,7 @@ public class RedisConfig {
             @Value("${spring.data.redis.port:6379}") int redisPort,
             @Value("${spring.data.redis.database:0}") int redisDatabase,
             @Value("${spring.data.redis.password:}") String redisPassword,
-            @Value("${spring.data.redis.cache.ttl:3600}") Duration cacheTtl) {
+            @Value("${spring.data.redis.cache.ttl:1h}") Duration cacheTtl) {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.redisDatabase = redisDatabase;

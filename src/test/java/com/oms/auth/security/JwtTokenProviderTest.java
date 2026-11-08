@@ -68,6 +68,51 @@ class JwtTokenProviderTest {
         assertThat(accessToken).isNotEqualTo(refreshToken);
     }
 
+    /**
+     * Refresh-token rotation must always yield a distinct token, even when the
+     * old and new token are minted within the same second (login followed
+     * immediately by /auth/refresh). Without a unique {@code jti} claim the
+     * payload ({@code sub}, {@code role}, {@code token_type}, {@code iat},
+     * {@code exp}) is identical and the HMAC signature is deterministic, so
+     * the "rotated" token would be byte-identical to the previous one and
+     * replay detection would silently pass.
+     */
+    @Test
+    void generateRefreshToken_shouldBeUniqueForSameUserAndInstant() {
+        JwtTokenProvider provider = createProvider();
+        String first = provider.generateRefreshToken("testuser", "CUSTOMER");
+        String second = provider.generateRefreshToken("testuser", "CUSTOMER");
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void generateAccessToken_shouldBeUniqueForSameUserAndInstant() {
+        JwtTokenProvider provider = createProvider();
+        String first = provider.generateAccessToken("testuser", "CUSTOMER");
+        String second = provider.generateAccessToken("testuser", "CUSTOMER");
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void generateToken_shouldCarryUniqueJwtIdClaim() {
+        JwtTokenProvider provider = createProvider();
+        String first = provider.generateRefreshToken("testuser", "CUSTOMER");
+        String second = provider.generateRefreshToken("testuser", "CUSTOMER");
+
+        String firstJti = io.jsonwebtoken.Jwts.parser()
+                .verifyWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(
+                        VALID_SECRET.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .build().parseSignedClaims(first).getPayload().getId();
+        String secondJti = io.jsonwebtoken.Jwts.parser()
+                .verifyWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(
+                        VALID_SECRET.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .build().parseSignedClaims(second).getPayload().getId();
+
+        assertThat(firstJti).isNotBlank();
+        assertThat(secondJti).isNotBlank();
+        assertThat(firstJti).isNotEqualTo(secondJti);
+    }
+
     @Test
     void extractUsername_shouldReturnUsername() {
         JwtTokenProvider provider = createProvider();

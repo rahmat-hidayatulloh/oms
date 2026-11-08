@@ -82,17 +82,39 @@ public class AuditLogAspect {
         }
     }
 
+    /**
+     * Resolves the audited entity id from the intercepted method's return value.
+     * <p>
+     * Supports both JavaBean getters ({@code getId()}) and record accessors
+     * ({@code id()}). The domain {@code *Response} types are records, so relying
+     * on {@code getId()} alone silently recorded a hash code instead of the real
+     * entity identifier — making audit rows impossible to correlate with the
+     * entity they describe.
+     *
+     * @param result the value returned by the intercepted method
+     * @return the entity id as text, or {@code null} when it cannot be resolved
+     */
     private String resolveEntityId(Object result) {
         if (result == null) {
             return null;
         }
+        Object id = invokeAccessor(result, "getId");
+        if (id == null) {
+            id = invokeAccessor(result, "id");
+        }
+        if (id != null) {
+            return id.toString();
+        }
+        return String.valueOf(result.hashCode());
+    }
+
+    private Object invokeAccessor(Object target, String methodName) {
         try {
-            Method getId = result.getClass().getMethod("getId");
-            Object id = getId.invoke(result);
-            return id != null ? id.toString() : null;
+            Method accessor = target.getClass().getMethod(methodName);
+            return accessor.invoke(target);
         } catch (NoSuchMethodException | IllegalAccessException
                  | java.lang.reflect.InvocationTargetException e) {
-            return String.valueOf(result.hashCode());
+            return null;
         }
     }
 

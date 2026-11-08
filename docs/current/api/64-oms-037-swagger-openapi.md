@@ -181,14 +181,29 @@ Anotasi `@Operation`, `@ApiResponses`, `@Parameter`, `@Tag` telah ditambahkan ke
 
 **File:** `src/main/java/com/oms/config/OpenApiConfig.java`
 
+Seluruh nilai spec berasal dari konfigurasi — tidak ada base URL yang di-hardcode dan tidak ada logika berbasis nama environment (standard 4.1 & 4.5):
+
+| Nilai spec | Sumber konfigurasi |
+|---|---|
+| `info.title` | `info.application.name` (default `oms`) |
+| `info.version` | `info.application.version` |
+| `info.description` | `springdoc.api-version` (default `v1`) |
+| `info.contact.url` | `app.api.base-url` (`API_BASE_URL`) via `ApiProperties` |
+
+`ApiProperties` (`@ConfigurationProperties(prefix = "app.api")`) didaftarkan oleh `ApiPropertiesConfig` — pola yang sama dengan `ErrorPropertiesConfig`. Spec sengaja **tidak** mendeklarasikan `servers[].url`, sehingga Swagger UI tetap menargetkan host yang melayani request.
+
 ```java
 @Bean
 public OpenAPI customOpenAPI() {
     return new OpenAPI()
             .info(new Info()
-                    .title("OMS API")
-                    .version("1.0.0")
-                    .description("Order Management System API - Documentation"))
+                    .title(appName.toUpperCase(Locale.ROOT) + " API")
+                    .version(appVersion)
+                    .description("Order Management System API - Documentation"
+                            + " (current version: " + apiVersion + ")")
+                    .contact(new Contact()
+                            .name("OMS API Team")
+                            .url(apiProperties.getBaseUrl())))
             .addSecurityItem(new SecurityRequirement().addList(OpenApiConstants.SCHEME_NAME_BEARER_AUTH))
             .components(new Components()
                     .addSecuritySchemes(OpenApiConstants.SCHEME_NAME_BEARER_AUTH, new SecurityScheme()

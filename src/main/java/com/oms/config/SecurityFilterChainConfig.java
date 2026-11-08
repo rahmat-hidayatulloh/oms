@@ -1,6 +1,8 @@
 package com.oms.config;
 
 import com.oms.auth.security.JwtAuthenticationFilter;
+import com.oms.auth.security.RestAccessDeniedHandler;
+import com.oms.auth.security.RestAuthenticationEntryPoint;
 
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -34,6 +36,8 @@ public class SecurityFilterChainConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     /**
      * Management security filter chain for actuator endpoints (port 8081).
@@ -71,6 +75,11 @@ public class SecurityFilterChainConfig {
                                 "/api/**", "/h2-console/**"))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 401 for anonymous calls (missing/invalid token) and 403 for
+                // authenticated calls lacking the role — both RFC 7807 shaped.
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/version").permitAll()

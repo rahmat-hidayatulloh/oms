@@ -520,6 +520,31 @@ Monitor Redis dengan:
 - **Spring Boot Actuator:** `GET /actuator/metrics/redis.*`
 - **RedisInsight:** GUI tool untuk Redis
 
+## ✅ Verifikasi End-to-End (Real Data, 07 Nov 2026)
+
+Dijalankan terhadap **staging** (PostgreSQL `omsdb_staging` + Redis db1) dengan
+app dari `target/oms-0.0.1-SNAPSHOT.jar` (env `env/staging.env`). Skrip smoke
+test: `/tmp/oms-smoke.sh` — **37/37 PASS** (login admin & customer, CRUD produk,
+cache invalidation, order lifecycle + approve, RBAC 401/403, refresh rotation,
+logout, soft delete, rate limit 429).
+
+Key Redis yang terverifikasi di `db1`:
+
+| Key | TTL | Arti |
+|---|---|---|
+| `products_list::all` | TTL cache | Cache `GET /api/v1/products` |
+| `products:user:<username>` | TTL cache | Cache per-user (list produk) |
+| `orders:user:<username>` | TTL cache | Cache list order per-user |
+| `refresh_token:<userId>` | ~7 hari | Refresh token per user (rotation) |
+| `auth-login:ip:<ip>` | 1 menit | Bucket rate limit login (Bucket4j) |
+| `auth:ip:<ip>` | 1 menit | Bucket rate limit auth umum |
+
+DB (PostgreSQL `omsdb_staging`) terverifikasi: order hasil approve berstatus
+`PAID`, dan `audit_log` mencatat `APPROVE | Order | <orderId>` oleh `admin`.
+
+> **Catatan:** `products_list::all` ter-invalidasi saat create/update/delete
+> produk (`@CacheEvict(allEntries=true)`), sehingga list selalu segar.
+
 ## 🔗 Referensi
 
 - [Spring Data Redis Documentation](https://docs.spring.io/spring-data/redis/docs/current/reference/html/)

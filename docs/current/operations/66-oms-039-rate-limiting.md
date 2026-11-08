@@ -171,7 +171,7 @@ Mendaftarkan `RateLimitInterceptor` untuk semua path `/api/**`.
 **Path:** `src/main/java/com/oms/ratelimit/IpResolver.java`, `src/main/java/com/oms/ratelimit/RateLimitResponseBuilder.java`
 
 - `IpResolver` — resolve IP client dengan dukungan `X-Forwarded-For` (menghormati `app.rate-limit.trusted-proxies`)
-- `RateLimitResponseBuilder` — membangun response 429 **RFC 7807 ProblemDetail** (`RATE_LIMIT_ERROR_URL`, `MSG_RATE_LIMIT_EXCEEDED`) beserta header rate-limit
+- `RateLimitResponseBuilder` — membangun response 429 **RFC 7807 ProblemDetail** (via `ProblemDetailFactory` + `ErrorCode.TOO_MANY_REQUESTS`; field `type` mengikuti `app.error.base-url`/`ERROR_BASE_URL`) beserta header rate-limit
 ---
 
 ## 3. FILE YANG DIUBAH
@@ -214,7 +214,7 @@ Konfigurasi per-endpoint rate limit dipusatkan di `src/main/resources/applicatio
 
 **Path:** `src/main/java/com/oms/constant/RateLimitConstants.java`
 
-Menambahkan constants: `HEADER_RATE_LIMIT_LIMIT`, `HEADER_RATE_LIMIT_REMAINING`, `HEADER_RATE_LIMIT_RESET`, `RATE_LIMIT_ERROR_URL`, dan `MSG_RATE_LIMIT_EXCEEDED`.
+Menambahkan constants: `HEADER_RATE_LIMIT_LIMIT`, `HEADER_RATE_LIMIT_REMAINING`, `HEADER_RATE_LIMIT_RESET`, dan `MSG_RATE_LIMIT_EXCEEDED`. (Konstanta `RATE_LIMIT_ERROR_URL` dihapus — URL `type` kini environment-aware via `ProblemDetailFactory`/`app.error.base-url`.)
 
 ### 3.5 spotbugs-exclude.xml
 

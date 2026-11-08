@@ -42,6 +42,24 @@
       "value": "",
       "type": "default",
       "description": "Customer password for authentication. Fill from GitHub Actions secret CUSTOMER_PASSWORD before running; never commit plaintext."
+    },
+    {
+      "key": "tokenType",
+      "value": "Bearer",
+      "type": "default",
+      "description": "Token type returned by the login endpoint (always Bearer)"
+    },
+    {
+      "key": "customerAccessToken",
+      "value": "",
+      "type": "default",
+      "description": "JWT of the CUSTOMER test account (set by 'Login (Customer)') - use it to assert RBAC 403 responses"
+    },
+    {
+      "key": "customerRefreshToken",
+      "value": "",
+      "type": "default",
+      "description": "Refresh token of the CUSTOMER test account (set by 'Login (Customer)')"
     }
   ],
   "_postman_variable_scope": "environment"

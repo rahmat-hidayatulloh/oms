@@ -1,5 +1,6 @@
 server:
-  port: 8080
+  # Overridable per environment (docker/k8s inject SERVER_PORT).
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
@@ -39,6 +40,11 @@ spring:
       port: ${REDIS_PORT:6379}
       timeout: 2000ms
       connect-timeout: 2000ms
+      # TTL entry cache (products, products_list, ...). WAJIB memakai satuan
+      # (mis. 1h / 30m / 3600s): angka tanpa satuan dibaca Spring sebagai
+      # MILIDETIK, sehingga nilai lama `3600` hanya berlaku 3,6 detik.
+      cache:
+        ttl: ${REDIS_CACHE_TTL:1h}
       lettuce:
         pool:
           max-active: 8
@@ -63,6 +69,13 @@ logging:
 
 # Application Configuration
 app:
+  # Public base URL of this API for the current environment. Used by the
+  # OpenAPI spec (contact URL) and any client-facing documentation. Set once
+  # per deployment via API_BASE_URL; never hardcoded or inferred from the
+  # profile name (standard 4.1 / 4.5).
+  api:
+    base-url: ${API_BASE_URL:http://localhost:8080}
+
   # External payment API (health check + future client calls).
   # The URL is built from an environment-specific base URL plus the health
   # path, so only PAYMENT_API_BASE_URL has to change per environment:
@@ -170,7 +183,7 @@ resilience4j:
 # Actuator
 management:
   server:
-    port: 8081
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:

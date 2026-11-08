@@ -41,6 +41,19 @@
         <sonar.organization>oms</sonar.organization>
         <sonar.projectKey>com.oms:oms</sonar.projectKey>
 
+        <!-- Security overrides (Trivy CRITICAL/HIGH remediation, Nov 2026).
+             Spring Boot 3.2.12 pins jackson 2.15.4 / tomcat 10.1.33 /
+             netty 4.1.115.Final, all of which carry fixable CVEs. Each
+             override stays on the SAME release line the boot version was
+             tested against (Jackson 2.x, Tomcat 10.1.x, Netty 4.1.x), so it
+             is a patch-level security bump rather than a framework upgrade.
+             The single remaining finding (CVE-2026-47884, spring-webmvc)
+             only ships a fix in Spring Framework 7.0.9 and is therefore
+             deferred in .trivyignore until the Spring Boot 4 upgrade. -->
+        <jackson-bom.version>2.18.11</jackson-bom.version>
+        <tomcat.version>10.1.61</tomcat.version>
+        <netty.version>4.1.137.Final</netty.version>
+
         <!-- Code analysis -->
         <checkstyle.config.location>config/checkstyle/checkstyle.xml</checkstyle.config.location>
         <checkstyle.failsOnError>true</checkstyle.failsOnError>

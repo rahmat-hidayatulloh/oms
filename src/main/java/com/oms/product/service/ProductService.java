@@ -45,10 +45,21 @@ public class ProductService implements ProductServiceInterface {
 
     /**
      * Creates a new product after validating that its name is unique.
-     * Updates the cache with the new product.
+     * <p>
+     * Cache effects:
+     * <ul>
+     *   <li>{@code @CachePut} stores the new product under {@code products::<id>}.</li>
+     *   <li>The {@code products_list} cache MUST also be evicted: without it
+     *       {@code GET /api/v1/products} kept serving the stale list (missing the
+     *       new product) for the whole cache TTL. {@code allEntries = true} clears
+     *       every list key so any future key scheme stays correct.</li>
+     * </ul>
      */
     @Override
-    @CachePut(value = CacheConstants.CACHE_PRODUCTS, key = "#result.id()")
+    @Caching(
+        put = @CachePut(value = CacheConstants.CACHE_PRODUCTS, key = "#result.id()"),
+        evict = @CacheEvict(value = CacheConstants.CACHE_PRODUCTS_LIST, allEntries = true)
+    )
     @Transactional
     public ProductResponse create(ProductRequest request) {
         if (productRepository.existsByName(request.name())) {
@@ -133,7 +144,7 @@ public class ProductService implements ProductServiceInterface {
     @Override
     @Caching(evict = {
         @CacheEvict(value = CacheConstants.CACHE_PRODUCTS, key = "#id"),
-        @CacheEvict(value = CacheConstants.CACHE_PRODUCTS_LIST, key = "'all'")
+        @CacheEvict(value = CacheConstants.CACHE_PRODUCTS_LIST, allEntries = true)
     })
     @Transactional
     public ProductResponse update(UUID id, ProductRequest request) {
@@ -165,7 +176,7 @@ public class ProductService implements ProductServiceInterface {
     @Override
     @Caching(evict = {
         @CacheEvict(value = CacheConstants.CACHE_PRODUCTS, key = "#id"),
-        @CacheEvict(value = CacheConstants.CACHE_PRODUCTS_LIST, key = "'all'")
+        @CacheEvict(value = CacheConstants.CACHE_PRODUCTS_LIST, allEntries = true)
     })
     @Transactional
     public void delete(UUID id) {

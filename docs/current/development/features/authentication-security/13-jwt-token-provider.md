@@ -13,8 +13,9 @@ Membuat utility untuk generate, validate, dan extract claims dari JWT token untu
 - [x] `JwtTokenProvider` dengan method: `generateAccessToken`, `generateRefreshToken`, `validateToken`, `extractUsername`, `extractRole`, `extractTokenType`
 - [x] Access token expiration: 1 hour (default)
 - [x] Refresh token expiration: 7 hari (default)
-- [x] Claims contain: username (subject), role, token_type, issuedAt, expiration
+- [x] Claims contain: username (subject), role, token_type, issuedAt, expiration, **jti (unique id)**
 - [x] Secret key dari application.yml
+- [x] Setiap token (access & refresh) membawa `jti` unik (UUID) agar rotasi refresh token selalu menghasilkan token berbeda
 
 ## Detail Pekerjaan
 
@@ -50,6 +51,7 @@ src/test/java/com/oms/auth/security/
 
 ```json
 {
+  "jti": "3f9c1e2a-...",      // unique token id (UUID) — nonce
   "sub": "admin",            // username (subject)
   "role": "ADMIN",           // role CUSTOMER / ADMIN
   "token_type": "access",    // access | refresh
@@ -57,6 +59,12 @@ src/test/java/com/oms/auth/security/
   "exp": 1747127056          // expiration (epoch ms)
 }
 ```
+
+> **`jti` (07 Nov 2026):** setiap token menyertakan `jti` UUID acak. Tanpa ini,
+> token yang dibuat pada detik yang sama (mis. login lalu `/auth/refresh`
+> seketika) memiliki payload identik dan tanda tangan HMAC deterministik,
+> sehingga token refresh hasil rotasi bisa byte-identik dengan yang lama dan
+> deteksi replay lolos. Dengan `jti`, rotasi selalu menghasilkan token unik.
 
 ### 4. Konfigurasi
 
@@ -91,6 +99,9 @@ Pure unit test (tanpa Spring context, instantiasi manual). Coverage:
 - ✅ `extractRole` kembalikan role ADMIN / CUSTOMER
 - ✅ `extractTokenType` kembalikan `access` / `refresh`
 - ✅ Claims berisi username, role, token_type, issuedAt, expiration
+- ✅ `generateRefreshToken` unik untuk user & instant yang sama (rotasi efektif)
+- ✅ `generateAccessToken` unik untuk user & instant yang sama
+- ✅ Token membawa klaim `jti` unik (UUID)
 
 ### 6. Hasil Verifikasi
 

@@ -18,6 +18,13 @@ public final class OrderConstants {
 
     public static final String DEFAULT_FALLBACK_EMAIL = "unknown@example.com";
     public static final String MSG_INVALID_REFRESH_TOKEN = "Invalid refresh token";
+    /**
+     * Approval guard message ({@link String#format} placeholders: order id,
+     * current status). Emitted when {@code approve} is called on an order that
+     * is not {@code PENDING}.
+     */
+    public static final String MSG_APPROVE_INVALID_STATUS =
+            "Order %s cannot be approved from status %s; only PENDING orders can be approved";
     public static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
     public static final String BLACKLIST_PREFIX = "blacklist:";
 

@@ -7,11 +7,12 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Method;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -65,6 +66,61 @@ class AuditLogAspectTest {
         Object result = auditLogAspect.auditMethod(joinPoint, auditable);
 
         assertThat(result).isEqualTo(expectedResult);
+    }
+
+    @Test
+    void auditMethod_shouldRecordEntityIdFromRecordAccessor() throws Throwable {
+        Auditable auditable = createAuditableAnnotation("APPROVE", "Order");
+        UUID orderId = UUID.randomUUID();
+        when(joinPoint.proceed()).thenReturn(new OrderIdRecord(orderId));
+        when(joinPoint.getSignature()).thenReturn(methodSignature);
+        when(methodSignature.getDeclaringType()).thenReturn(String.class);
+        when(methodSignature.getName()).thenReturn("approve");
+
+        auditLogAspect.auditMethod(joinPoint, auditable);
+
+        ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        // Records expose `id()` (not `getId()`); the aspect must resolve the real
+        // identifier instead of falling back to the object hash code.
+        assertThat(captor.getValue().entityId()).isEqualTo(orderId.toString());
+        assertThat(captor.getValue().action()).isEqualTo("APPROVE");
+        assertThat(captor.getValue().entityType()).isEqualTo("Order");
+    }
+
+    @Test
+    void auditMethod_shouldRecordEntityIdFromJavaBeanGetter() throws Throwable {
+        Auditable auditable = createAuditableAnnotation("UPDATE", "Product");
+        when(joinPoint.proceed()).thenReturn(new BeanWithId("product-42"));
+        when(joinPoint.getSignature()).thenReturn(methodSignature);
+        when(methodSignature.getDeclaringType()).thenReturn(String.class);
+        when(methodSignature.getName()).thenReturn("update");
+
+        auditLogAspect.auditMethod(joinPoint, auditable);
+
+        ArgumentCaptor<AuditLogService.AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditLogService.AuditEvent.class);
+        verify(auditLogService).record(captor.capture());
+        assertThat(captor.getValue().entityId()).isEqualTo("product-42");
+    }
+
+    /** Minimal record exposing an {@code id()} accessor, like the domain responses. */
+    private record OrderIdRecord(UUID id) {
+    }
+
+    /** Minimal JavaBean exposing a {@code getId()} getter. */
+    private static final class BeanWithId {
+
+        private final String id;
+
+        private BeanWithId(String id) {
+            this.id = id;
+        }
+
+        public String getId() {
+            return id;
+        }
     }
 
     private Auditable createAuditableAnnotation(

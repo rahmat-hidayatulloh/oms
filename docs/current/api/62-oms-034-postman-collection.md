@@ -49,6 +49,7 @@ Postman Collection dibuat untuk memudahkan testing dan dokumentasi seluruh API O
 OMS API Collection
 ├── 📁 Auth
 │   ├── POST Login
+│   ├── POST Login (Customer)
 │   ├── POST Register
 │   ├── POST Refresh Token
 │   ├── POST Logout
@@ -64,6 +65,7 @@ OMS API Collection
 │   ├── POST Create Order
 │   ├── GET Get All Orders
 │   ├── GET Get Order By ID
+│   ├── POST Approve Order
 │   └── DELETE Delete Order
 ├── 📁 Admin
 │   ├── GET Get Dashboard
@@ -78,6 +80,7 @@ OMS API Collection
 | Modul | Method | Endpoint | Auth | Role |
 |-------|--------|----------|:---:|:----:|
 | **Auth** | POST | `/api/v1/auth/login` | ❌ | Public |
+| **Auth** | POST | `/api/v1/auth/login` (Customer) | ❌ | Public |
 | **Auth** | POST | `/api/v1/auth/register` | ❌ | Public |
 | **Auth** | POST | `/api/v1/auth/refresh` | ❌ | Public |
 | **Auth** | POST | `/api/v1/auth/logout` | ✅ | Any |
@@ -91,6 +94,7 @@ OMS API Collection
 | **Order** | POST | `/api/v1/orders` | ✅ | Any |
 | **Order** | GET | `/api/v1/orders` | ✅ | ADMIN |
 | **Order** | GET | `/api/v1/orders/{id}` | ✅ | Any |
+| **Order** | POST | `/api/v1/orders/{id}/approve` | ✅ | ADMIN |
 | **Order** | DELETE | `/api/v1/orders/{id}` | ✅ | Any |
 | **Admin** | GET | `/api/v1/admin/dashboard` | ✅ | ADMIN |
 | **Admin** | GET | `/api/v1/admin/users` | ✅ | ADMIN |
@@ -114,6 +118,9 @@ OMS API Collection
 | `{{adminPassword}}` | *(diisi dari `secrets.ADMIN_PASSWORD`)* | Password admin untuk testing — jangan hardcode |
 | `{{customerUsername}}` | `customer` | Username customer untuk testing |
 | `{{customerPassword}}` | *(diisi dari `secrets.CUSTOMER_PASSWORD`)* | Password customer untuk testing — jangan hardcode |
+| `{{tokenType}}` | `Bearer` | Token type (di-set dari response Login) |
+| `{{customerAccessToken}}` | (empty) | JWT customer (di-set dari **Login (Customer)**) — untuk skenario RBAC 403 |
+| `{{customerRefreshToken}}` | (empty) | Refresh token customer (di-set dari **Login (Customer)**) |
 
 ### 3.2 Multi-Environment Support
 
@@ -142,6 +149,9 @@ Terdapat **3 file environment terpisah**, masing-masing mengambil referensi dari
 | `{{adminPassword}}` | *(diisi dari `secrets.ADMIN_PASSWORD`)* | Admin password — jangan hardcode | Manual |
 | `{{customerUsername}}` | `customer` | Customer username | Manual |
 | `{{customerPassword}}` | *(diisi dari `secrets.CUSTOMER_PASSWORD`)* | Customer password — jangan hardcode | Manual |
+| `{{tokenType}}` | `Bearer` | Token type | Login test script |
+| `{{customerAccessToken}}` | (empty) | JWT customer — skenario RBAC 403 | Login (Customer) test script |
+| `{{customerRefreshToken}}` | (empty) | Refresh token customer | Login (Customer) test script |
 
 ---
 
@@ -932,6 +942,7 @@ GET /api/v1/products/search?name=kaos&minPrice=50000&maxPrice=200000&category=CL
 | POST /orders | 201 | 400 | 401 | - | 404 |
 | GET /orders | 200 | - | 401 | 403 | - |
 | GET /orders/{id} | 200 | - | 401 | 403 | 404 |
+| POST /orders/{id}/approve | 200 | - | 401 | 403 | 404 (409 bila bukan PENDING) |
 | DELETE /orders/{id} | 200 | - | 401 | 403 | 404 |
 | GET /admin/dashboard | 200 | - | 401 | 403 | - |
 | GET /admin/users | 200 | - | 401 | 403 | - |
@@ -990,7 +1001,7 @@ Pada 7 Agustus 2026 dilakukan pengecekan ulang terhadap task OMS-034. Ditemukan 
 |----|----------|:---:|--------------|
 | 1 | Export collection ke file OMS_API_Collection.json | ✅ | File exists (52,982 bytes) - valid Postman Collection v2.1.0 schema |
 | 2 | Environment variables: {{baseUrl}}, {{accessToken}}, {{refreshToken}} | ✅ | 3 file environment: `OMS_API_Environment.json`, `OMS_API_Environment-Staging.json`, `OMS_API_Environment-Production.json` |
-| 3 | Collection structure by module: Auth, Product, Order | ✅ | Folders: `Auth` (5), `Product` (6), `Order` (4), `Admin` (2), `System` (2) |
+| 3 | Collection structure by module: Auth, Product, Order | ✅ | Folders: `Auth` (6), `Product` (6), `Order` (5), `Admin` (2), `System` (2) |
 | 4 | Setiap request punya contoh request body dan response | ✅ | 8 POST/PUT endpoints punya request body; 19 endpoints punya contoh response (success & error) |
 | 5 | Tests script untuk validasi response | ✅ | 19 test scripts terverifikasi (status code, response body, field presence, JWT format) |
 | 6 | Collection variables untuk sharing data antar request | ✅ | `productId`, `orderId`, `orderNumber`, `tokenExpired` collection variables |
@@ -998,13 +1009,13 @@ Pada 7 Agustus 2026 dilakukan pengecekan ulang terhadap task OMS-034. Ditemukan 
 
 ### 13.3 Endpoints Verified (Final)
 
-Total **19 endpoints** terverifikasi di collection:
+Total **21 endpoints** terverifikasi di collection:
 
 | Modul | Endpoints | Method |
 |-------|-----------|--------|
-| Auth (5) | login, register, refresh, logout, csrf | POST, POST, POST, POST, GET |
+| Auth (6) | login, login-customer, register, refresh, logout, csrf | POST, POST, POST, POST, POST, GET |
 | Product (6) | create, getAll, getById, search, update, delete | POST, GET, GET, GET, PUT, DELETE |
-| Order (4) | create, getAll, getById, delete | POST, GET, GET, DELETE |
+| Order (5) | create, getAll, getById, approve, delete | POST, GET, GET, POST, DELETE |
 | Admin (2) | dashboard, users | GET, GET |
 | System (2) | version, health | GET, GET |
 
@@ -1019,6 +1030,9 @@ Total **19 endpoints** terverifikasi di collection:
 | `{{baseUrl}}` | Environment | Import | Semua requests |
 | `{{accessToken}}` | Environment | Login | All protected endpoints |
 | `{{refreshToken}}` | Environment | Login | Refresh token |
+| `{{customerAccessToken}}` | Environment | Login (Customer) | Skenario RBAC (403) |
+| `{{customerRefreshToken}}` | Environment | Login (Customer) | Refresh token customer |
+| `{{tokenType}}` | Environment | Login | Validasi response |
 
 ### 13.5 Environment Files Mapping
 
@@ -1035,6 +1049,18 @@ Total **19 endpoints** terverifikasi di collection:
 - Folder Auth kini: `Login`, `Register`, `Refresh Token`, `Logout`, `Get CSRF Token` (5 item).
 - Tool collection saat ini: **19 endpoints**, **19 test scripts**, file `OMS_API_Collection.json` = **52,982 bytes**.
 
+### 13.7 Pembaruan 6 November 2026 (Verifikasi Real-Data Dev/Staging/Prod)
+
+- **`Login (Customer)`** ditambahkan ke folder Auth. Menyimpan token ke `customerAccessToken` / `customerRefreshToken` (terpisah dari token admin) sehingga skenario RBAC dapat mengirim token customer dan menegaskan `403 Forbidden` pada endpoint ADMIN-only.
+- **`Approve Order`** (`POST /api/v1/orders/{id}/approve`) ditambahkan ke folder Order dengan contoh response `200` (PENDING → PAID) dan `409` (bukan PENDING). Skenario: ADMIN approve `200`, approve ulang `409`, CUSTOMER `403`, id tak dikenal `404`.
+- **Semantik 401 vs 403 diklarifikasi** dan diverifikasi terhadap runtime:
+  - `401 Unauthorized` — request tanpa kredensial valid (filter chain) → `title: Authentication Failed`.
+  - `403 Forbidden` — terautentikasi tapi tidak punya role yang dibutuhkan → `title: Access Denied`.
+  - Keduanya memakai envelope RFC 7807 `application/problem+json` yang sama dengan handler MVC (lewat `RestAuthenticationEntryPoint` / `RestAccessDeniedHandler` + `ProblemDetailFactory`).
+- Contoh response `401` ditambahkan ke `GET /orders` dan `403` ke `GET /admin/dashboard`.
+- Environment files (Dev/Staging/Prod) ditambah variabel `tokenType`, `customerAccessToken`, `customerRefreshToken`.
+- Tool collection saat ini: **21 endpoints** (Auth 6, Product 6, Order 5, Admin 2, System 2).
+
 ---
 
 ## 14. KESIMPULAN
@@ -1042,9 +1068,9 @@ Total **19 endpoints** terverifikasi di collection:
 Postman Collection untuk OMS API telah berhasil diperbaiki dan diverifikasi dengan:
 
 - ✅ **5 folder** (Auth, Product, Order, Admin, System)
-- ✅ **19 endpoints** tercakup semua
+- ✅ **21 endpoints** tercakup semua
 - ✅ **3 file environment** terpisah untuk dev, staging, prod
-- ✅ **Environment variables** (`{{baseUrl}}`, `{{accessToken}}`, `{{refreshToken}}`, dll)
+- ✅ **Environment variables** (`{{baseUrl}}`, `{{accessToken}}`, `{{refreshToken}}`, `{{customerAccessToken}}`, dll)
 - ✅ **Collection variables** untuk sharing data antar request (productId, orderId, orderNumber, tokenExpired)
 - ✅ **Test scripts** untuk validasi response (status code, response body, JWT format, timing)
 - ✅ **Auto-authorization** via collection-level auth (Bearer token)

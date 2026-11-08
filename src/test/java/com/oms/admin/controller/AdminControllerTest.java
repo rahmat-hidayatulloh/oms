@@ -86,8 +86,8 @@ class AdminControllerTest {
     }
 
     @Test
-    void getDashboard_shouldReturn403WhenUnauthenticated() throws Exception {
+    void getDashboard_shouldReturn401WhenUnauthenticated() throws Exception {
         mockMvc.perform(get("/api/v1/admin/dashboard"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

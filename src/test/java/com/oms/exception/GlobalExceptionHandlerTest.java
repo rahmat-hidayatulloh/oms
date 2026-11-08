@@ -138,7 +138,7 @@ class GlobalExceptionHandlerTest {
         // Unauthenticated request: Spring Security's filter returns default 403
         // without ProblemDetail structure
         mockMvc.perform(get("/api/v1/products"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

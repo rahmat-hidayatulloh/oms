@@ -144,7 +144,7 @@ class ProductControllerUnitTest {
                             "category": "CLOTHING"
                         }
                         """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

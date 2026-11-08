@@ -1,10 +1,12 @@
 spring:
-  # H2 In-Memory Database
+  # H2 In-Memory Database by default, but every connection property is
+  # overridable so dev can point at a file-based H2 (DB_URL=jdbc:h2:file:...)
+  # or a real PostgreSQL instance without editing this file.
   datasource:
-    url: jdbc:h2:mem:omsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: ${DB_URL:jdbc:h2:mem:omsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER_CLASS_NAME:org.h2.Driver}
     hikari:
       minimum-idle: 2
       maximum-pool-size: 5
@@ -39,10 +41,18 @@ spring:
       settings:
         web-allow-others: false
 
-  # Redis disabled for dev
+  # Redis is disabled by default in dev so the app still boots on a machine
+  # without Redis. Set REDIS_ENABLED=true (done by env/dev.env) to exercise the
+  # cache, refresh-token store and distributed rate limiter locally.
   data:
     redis:
-      enabled: false
+      enabled: ${REDIS_ENABLED:false}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2000ms
+      connect-timeout: 2000ms
 
   # Devtools configuration
   devtools:

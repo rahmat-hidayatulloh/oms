@@ -109,7 +109,7 @@ app:
 
 ## Response 429 (RFC 7807 ProblemDetail)
 
-Dibangun `RateLimitResponseBuilder` (`RateLimitConstants.RATE_LIMIT_ERROR_URL`, `MSG_RATE_LIMIT_EXCEEDED`):
+Dibangun `RateLimitResponseBuilder` (via `ProblemDetailFactory` + `ErrorCode.TOO_MANY_REQUESTS`). Field `type` mengikuti `app.error.base-url` (`ERROR_BASE_URL`) sehingga environment-aware — tidak ada URL hardcoded (standard 4.1):
 
 ```json
 {
@@ -121,6 +121,8 @@ Dibangun `RateLimitResponseBuilder` (`RateLimitConstants.RATE_LIMIT_ERROR_URL`, 
   "timestamp": "2026-08-10T12:00:00"
 }
 ```
+
+> Contoh di atas memakai nilai produksi (`https://api.oms.com/errors`). Di dev/staging nilai `type` mengikuti `ERROR_BASE_URL` masing-masing (mis. `http://localhost:8080/errors/429`).
 
 ## Catatan / batasan
 

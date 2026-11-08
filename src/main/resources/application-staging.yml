@@ -38,7 +38,7 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:9}
-      enabled: true
+      enabled: ${REDIS_ENABLED:true}
       # V4-05: connection pooling for staging (smaller than prod — staging
       # does not need the same pool size, but pooling prevents connection
       # exhaustion during load testing and keeps behavior consistent with prod)
@@ -68,7 +68,7 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/oms-staging.log
+    name: ${LOG_FILE:logs/oms-staging.log}
     max-size: 10MB
     max-history: 7
 

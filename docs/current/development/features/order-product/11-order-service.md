@@ -137,13 +137,16 @@ Authorization: Bearer <jwt-token>   # role ADMIN
 
 Alur `approve`:
 1. `findByIdWithItems(id)` — jika order tidak ada, throw `ResourceNotFoundException` (→ `404`).
-2. Guard status: hanya `PENDING` → `PAID` yang diizinkan. Jika status bukan `PENDING`, throw `InvalidStatusTransitionException` (→ `409 Conflict`, `ErrorCode.INVALID_STATUS_TRANSITION`).
+2. Guard status: hanya `PENDING` → `PAID` yang diizinkan. Jika status bukan `PENDING`, throw `InvalidStatusTransitionException` (→ `409 Conflict`, `ErrorCode.INVALID_STATUS_TRANSITION`). Pesan penolakan memakai konstanta `OrderConstants.MSG_APPROVE_INVALID_STATUS`.
 3. `order.setStatus(PAID)` lalu `orderRepository.save(order)` dan kembalikan `OrderResponse`.
 
+#### Audit Trail
+`approve` diberi `@Auditable(action = "APPROVE", entityType = OrderConstants.ENTITY_ORDER)`, sehingga transisi status kritis oleh admin tercatat di `audit_log` (standard 12.11 — centralized audit log): action `APPROVE`, entity `Order`, entity id = `OrderResponse.id()` (accessor record), principal = admin yang login, IP dari `X-Forwarded-For`/remoteAddr.
+
 #### Role & Keamanan
-- Endpoint di-guard dengan `@PreAuthorize("hasRole('ADMIN')")`.
-- Non-admin yang terautentikasi → `403 Forbidden` (ditangani `SecurityExceptionHandler`).
-- Tidak terautentikasi → `401/403` oleh filter chain.
+- Endpoint di-guard dengan `@PreAuthorize("hasRole('ADMIN')")` — role diperiksa di level method (bukan hanya filter chain), sehingga `ROLE_CUSTOMER` tidak bisa approve meskipun sudah login.
+- Non-admin yang terautentikasi → `403 Forbidden` (`RestAccessDeniedHandler`, envelope RFC 7807 `application/problem+json`).
+- Tidak terautentikasi → `401 Unauthorized` (`RestAuthenticationEntryPoint`), bukan `403`, sehingga klien bisa membedakan "belum login" vs "tidak punya role".
 
 #### Status Flow
 ```
@@ -159,3 +162,16 @@ Order **tidak** di-cache (hanya `Product` yang di-cache via Redis). Karena itu `
 #### Unit Test (OrderControllerTest)
 - ✅ `approveOrder_adminShouldReturn200WithPaidStatus` — admin approve → `200` + status `PAID`
 - ✅ `approveOrder_nonPendingOrderShouldThrowInvalidStatusTransition` — status bukan `PENDING` → `InvalidStatusTransitionException`
+
+#### Unit Test (OrderServiceTest)
+- ✅ `approve_shouldTransitionPendingOrderToPaid` — order `PENDING` → status `PAID` tersimpan
+- ✅ `approve_shouldRejectNonPendingOrderWithConstantMessage` — non-`PENDING` → `InvalidStatusTransitionException` dengan pesan `OrderConstants.MSG_APPROVE_INVALID_STATUS`
+- ✅ `approve_shouldThrowNotFoundWhenOrderMissing` — order tidak ada → `ResourceNotFoundException`
+
+#### Verifikasi Real Data (07 Nov 2026)
+Diuji end-to-end terhadap staging (PostgreSQL `omsdb_staging` + Redis db1) memakai app hasil `clean install` dan `env/staging.env`:
+- `POST /orders` (customer) → `201`, status `PENDING`.
+- `POST /orders/{id}/approve` dengan token **customer** → `403` (`type` = `http://localhost:8080/errors/403`).
+- `POST /orders/{id}/approve` dengan token **admin** → `200`, status `PAID`; baris `orders.status` di DB = `PAID`.
+- Approve ulang → `409` (`INVALID_STATUS_TRANSITION`).
+- `audit_log` mencatat `APPROVE | Order | <orderId>` dengan `user_id = admin`.

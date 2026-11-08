@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "OMS API Collection",
-    "description": "Postman Collection for OMS (Order Management System) API\n\n## Base URL\nAll endpoints are prefixed with `{{baseUrl}}` (default: `http://localhost:8080`).\n\n## Authentication\n1. Call `POST /api/v1/auth/login` to obtain `accessToken` and `refreshToken`.\n2. The `accessToken` is automatically attached to subsequent requests via the pre-request script.\n3. When the `accessToken` expires, use `POST /api/v1/auth/refresh` to obtain a new token pair.\n\n## Collection Variables\n- `productId` — ID of the last created/updated product\n- `orderId` — ID of the last created order\n- `orderNumber` — order number of the last created order\n\n## Environment Variables\n- `{{baseUrl}}` — API base URL\n- `{{accessToken}}` — JWT Bearer token for authenticated requests\n- `{{refreshToken}}` — JWT token used to obtain a new access token",
+    "description": "Postman Collection for OMS (Order Management System) API\n\n## Base URL\nAll endpoints are prefixed with `{{baseUrl}}` (default: `http://localhost:8080`).\n\n## Authentication\n1. Call `POST /api/v1/auth/login` to obtain `accessToken` and `refreshToken`.\n2. The `accessToken` is automatically attached to subsequent requests via the pre-request script.\n3. When the `accessToken` expires, use `POST /api/v1/auth/refresh` to obtain a new token pair.\n\n## Collection Variables\n- `productId` — ID of the last created/updated product\n- `orderId` — ID of the last created order\n- `orderNumber` — order number of the last created order\n\n## Authentication Errors\nRejections raised inside the security filter chain use the same RFC 7807 envelope as the\nMVC handlers (`application/problem+json`):\n- `401 Unauthorized` - no or invalid credentials (`title: Authentication Failed`)\n- `403 Forbidden` - authenticated but missing the required role (`title: Access Denied`)\n\n## Typical Flow\n1. `Login` (admin) -> `accessToken`\n2. `Login (Customer)` -> `customerAccessToken` (RBAC checks)\n3. `Create Product` -> `productId`\n4. `Create Order` -> `orderId` / `orderNumber`\n5. `Approve Order` -> `status` becomes `PAID`\n6. `Refresh Token` then `Logout` (the refresh token is revoked server-side)\n\n## Environment Variables\n- `{{baseUrl}}` — API base URL\n- `{{accessToken}}` — JWT Bearer token for authenticated requests\n- `{{refreshToken}}` — JWT token used to obtain a new access token",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -155,6 +155,75 @@
                 }
               ],
               "body": "{\n    \"type\": \"https://api.oms.com/errors/401\",\n    \"title\": \"Authentication Failed\",\n    \"status\": 401,\n    \"detail\": \"Bad credentials\",\n    \"instance\": \"/api/v1/auth/login\",\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Customer token carries the CUSTOMER role', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var payload = JSON.parse(atob(jsonData.accessToken.split('.')[1]));",
+                  "    pm.expect(payload.role).to.eql('CUSTOMER');",
+                  "});",
+                  "",
+                  "pm.test('Store customer tokens separately from admin tokens', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('customerAccessToken', jsonData.accessToken);",
+                  "    pm.environment.set('customerRefreshToken', jsonData.refreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{customerUsername}}\",\n    \"password\": \"{{customerPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate as the CUSTOMER test account. Tokens are stored in `customerAccessToken` / `customerRefreshToken` so RBAC scenarios can send the customer token via a manual `Authorization: Bearer {{customerAccessToken}}` header and assert 403 Forbidden on ADMIN-only endpoints."
+          },
+          "response": [
+            {
+              "name": "Customer Login Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjdXN0b21lcjAyIiwicm9sZSI6IkNVU1RPTUVSIiwidG9rZW5fdHlwZSI6ImFjY2VzcyJ9.signature\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjdXN0b21lcjAyIiwicm9sZSI6IkNVU1RPTUVSIiwidG9rZW5fdHlwZSI6InJlZnJlc2gifQ.signature\",\n    \"tokenType\": \"Bearer\"\n}"
             }
           ]
         },
@@ -1018,6 +1087,18 @@
                 }
               ],
               "body": "{\n    \"content\": [\n        {\n            \"id\": \"660e8400-e29b-41d4-a716-446655440000\",\n            \"orderNumber\": \"OMS-20260806-4821\",\n            \"totalAmount\": 170000.00,\n            \"status\": \"PENDING\",\n            \"items\": [\n                {\n                    \"productId\": \"550e8400-e29b-41d4-a716-446655440000\",\n                    \"productName\": \"Kaos Polos Hitam\",\n                    \"quantity\": 2,\n                    \"price\": 85000.00,\n                    \"subtotal\": 170000.00\n                }\n            ],\n            \"createdAt\": \"2026-08-06T15:00:00\"\n        }\n    ],\n    \"totalElements\": 1,\n    \"totalPages\": 1,\n    \"number\": 0,\n    \"size\": 10\n}"
+            },
+            {
+              "name": "Unauthorized (No Token)",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/401\",\n    \"title\": \"Authentication Failed\",\n    \"status\": 401,\n    \"detail\": \"Authentication is required to access this resource\",\n    \"instance\": \"/api/v1/orders\",\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
             }
           ]
         },
@@ -1074,6 +1155,76 @@
                 }
               ],
               "body": "{\n    \"id\": \"660e8400-e29b-41d4-a716-446655440000\",\n    \"orderNumber\": \"OMS-20260806-4821\",\n    \"userId\": \"770e8400-e29b-41d4-a716-446655440000\",\n    \"totalAmount\": 170000.00,\n    \"status\": \"PENDING\",\n    \"items\": [\n        {\n            \"productId\": \"550e8400-e29b-41d4-a716-446655440000\",\n            \"productName\": \"Kaos Polos Hitam\",\n            \"quantity\": 2,\n            \"price\": 85000.00,\n            \"subtotal\": 170000.00\n        }\n    ],\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Approve Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order transitioned PENDING -> PAID', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('PAID');",
+                  "});",
+                  "",
+                  "pm.test('Approved order keeps its identity', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('orderId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{orderId}}",
+                "approve"
+              ]
+            },
+            "description": "Approve a PENDING order and move it to PAID (ADMIN only).\n\n| Caller | Result |\n| --- | --- |\n| ADMIN, PENDING order | `200 OK`, `status` becomes `PAID` |\n| ADMIN, already PAID | `409 Conflict` - invalid status transition |\n| CUSTOMER | `403 Forbidden` - ProblemDetail |\n| Unknown order id | `404 Not Found` |"
+          },
+          "response": [
+            {
+              "name": "Approve Order Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"id\": \"660e8400-e29b-41d4-a716-446655440000\",\n    \"orderNumber\": \"OMS-20260806-4821\",\n    \"userId\": \"770e8400-e29b-41d4-a716-446655440000\",\n    \"totalAmount\": 170000.00,\n    \"status\": \"PAID\",\n    \"items\": [\n        {\n            \"productId\": \"550e8400-e29b-41d4-a716-446655440000\",\n            \"productName\": \"Kaos Polos Hitam\",\n            \"quantity\": 2,\n            \"price\": 85000.00,\n            \"subtotal\": 170000.00\n        }\n    ],\n    \"createdAt\": \"2026-08-06T15:00:00\",\n    \"updatedAt\": \"2026-08-06T15:05:00\"\n}"
+            },
+            {
+              "name": "Approve Order Conflict (Already Paid)",
+              "status": "Conflict",
+              "code": 409,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/409\",\n    \"title\": \"Conflict\",\n    \"status\": 409,\n    \"detail\": \"Order 660e8400-e29b-41d4-a716-446655440000 is not in PENDING status\",\n    \"instance\": \"/api/v1/orders/660e8400-e29b-41d4-a716-446655440000/approve\",\n    \"timestamp\": \"2026-08-06T15:06:00\"\n}"
             }
           ]
         },
@@ -1192,6 +1343,18 @@
                 }
               ],
               "body": "{\n    \"totalUsers\": 10,\n    \"totalProducts\": 25,\n    \"totalOrders\": 50,\n    \"revenue\": 12500000.00\n}"
+            },
+            {
+              "name": "Forbidden (Customer Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/problem+json"
+                }
+              ],
+              "body": "{\n    \"type\": \"https://api.oms.com/errors/403\",\n    \"title\": \"Access Denied\",\n    \"status\": 403,\n    \"detail\": \"You don't have permission to access this resource\",\n    \"instance\": \"/api/v1/admin/dashboard\",\n    \"timestamp\": \"2026-08-06T15:00:00\"\n}"
             }
           ]
         },

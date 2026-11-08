@@ -325,7 +325,7 @@ class OrderFlowIntegrationTest {
 
 
     @Test
-    void createOrder_withoutAuth_shouldReturn403() {
+    void createOrder_withoutAuth_shouldReturn401() {
         OrderRequest request = new OrderRequest(List.of(
                 new OrderItemRequest(testProduct.getId(), 1)));
 
@@ -340,7 +340,7 @@ class OrderFlowIntegrationTest {
                 entity,
                 String.class);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
 

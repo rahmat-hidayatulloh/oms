@@ -97,13 +97,13 @@ class ProductControllerTest {
     }
 
     @Test
-    void createProduct_shouldReturn403WhenUnauthenticated() throws Exception {
+    void createProduct_shouldReturn401WhenUnauthenticated() throws Exception {
         ProductRequest request = sampleRequest();
 
         mockMvc.perform(post("/api/v1/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
 

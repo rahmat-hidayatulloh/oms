@@ -17,6 +17,7 @@ import com.oms.auth.entity.User;
 import com.oms.order.repository.OrderRepository;
 import com.oms.auth.repository.UserRepository;
 import com.oms.order.OrderConstants;
+import com.oms.audit.annotation.Auditable;
 import com.oms.exception.ResourceNotFoundException;
 import com.oms.exception.InvalidStatusTransitionException;
 
@@ -192,7 +193,25 @@ public class OrderService implements OrderServiceInterface {
         log.info("Soft-deleted order {} by user '{}'", id, username);
     }
 
+    /**
+     * Approves a PENDING order by transitioning it to PAID.
+     * <p>
+     * Only the state {@code PENDING -> PAID} is allowed; any other status raises
+     * {@link InvalidStatusTransitionException} (HTTP 409,
+     * {@code ErrorCode.INVALID_STATUS_TRANSITION}). The endpoint that calls this
+     * method is guarded by {@code @PreAuthorize("hasRole('ADMIN')")}, so the
+     * caller is always an authenticated administrator.
+     * <p>
+     * The transition is recorded in the audit log
+     * ({@code audit_log}: action {@code APPROVE}, entity {@code Order}) with the
+     * approving principal and the order id, as required for critical state
+     * changes (standard 12.11 — centralized audit log).
+     *
+     * @param id the order ID to approve
+     * @return the updated order with status {@code PAID}
+     */
     @Override
+    @Auditable(action = "APPROVE", entityType = OrderConstants.ENTITY_ORDER)
     @Transactional
     public OrderResponse approve(UUID id) {
         Order order = orderRepository.findByIdWithItems(id)
@@ -201,8 +220,8 @@ public class OrderService implements OrderServiceInterface {
 
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new InvalidStatusTransitionException(
-                    "Order " + id + " cannot be approved from status "
-                            + order.getStatus() + "; only PENDING orders can be approved");
+                    String.format(OrderConstants.MSG_APPROVE_INVALID_STATUS,
+                            id, order.getStatus()));
         }
 
         order.setStatus(OrderStatus.PAID);

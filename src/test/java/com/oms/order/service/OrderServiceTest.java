@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +21,10 @@ import com.oms.order.dto.OrderRequest;
 import com.oms.order.dto.OrderResponse;
 import com.oms.order.entity.Order;
 import com.oms.order.entity.OrderItem;
+import com.oms.order.entity.OrderStatus;
+import com.oms.order.OrderConstants;
 import com.oms.exception.BadRequestException;
+import com.oms.exception.InvalidStatusTransitionException;
 import com.oms.exception.ResourceNotFoundException;
 import com.oms.order.repository.OrderRepository;
 import com.oms.auth.entity.User;
@@ -254,5 +258,56 @@ class OrderServiceTest {
 
         assertTrue(result.getContent().isEmpty());
         verify(orderRepository, times(1)).findAll(any(PageRequest.class));
+    }
+
+    @Test
+    void approve_shouldTransitionPendingOrderToPaid() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .orderNumber("ORD-0001")
+                .userId(UUID.randomUUID())
+                .totalAmount(new BigDecimal("15000.00"))
+                .status(OrderStatus.PENDING)
+                .orderItems(new ArrayList<>())
+                .build();
+        when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = orderService.approve(orderId);
+
+        assertEquals(OrderStatus.PAID, response.status());
+        assertEquals(orderId, response.id());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void approve_shouldRejectNonPendingOrderWithConstantMessage() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .orderNumber("ORD-0002")
+                .userId(UUID.randomUUID())
+                .totalAmount(new BigDecimal("15000.00"))
+                .status(OrderStatus.SHIPPED)
+                .orderItems(new ArrayList<>())
+                .build();
+        when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.of(order));
+
+        InvalidStatusTransitionException ex = assertThrows(
+                InvalidStatusTransitionException.class,
+                () -> orderService.approve(orderId));
+
+        assertEquals(String.format(OrderConstants.MSG_APPROVE_INVALID_STATUS,
+                orderId, OrderStatus.SHIPPED), ex.getMessage());
+        verify(orderRepository, times(0)).save(any(Order.class));
+    }
+
+    @Test
+    void approve_shouldThrowNotFoundWhenOrderMissing() {
+        UUID orderId = UUID.randomUUID();
+        when(orderRepository.findByIdWithItems(orderId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> orderService.approve(orderId));
     }
 }

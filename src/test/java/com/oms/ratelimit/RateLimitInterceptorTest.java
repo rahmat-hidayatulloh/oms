@@ -1,11 +1,17 @@
 package com.oms.ratelimit;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.oms.auth.controller.AuthController;
+import com.oms.config.ErrorProperties;
+import com.oms.exception.ProblemDetailFactory;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
@@ -18,6 +24,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RateLimitInterceptorTest {
 
+    private static final String TEST_ERROR_BASE_URL = "https://staging-api.oms.com/errors";
+
     @Mock
     private RateLimitService rateLimitService;
 
@@ -29,7 +37,14 @@ class RateLimitInterceptorTest {
     void setUp() {
         RateLimitProperties properties = new RateLimitProperties();
         ipResolver = new IpResolver(properties);
-        responseBuilder = new RateLimitResponseBuilder();
+        // The 429 body must flow through the shared ProblemDetail envelope so
+        // the `type` URI follows `app.error.base-url` instead of a hardcoded
+        // constant. A non-default base URL proves the value is configurable.
+        ErrorProperties errorProperties = new ErrorProperties();
+        errorProperties.setBaseUrl(TEST_ERROR_BASE_URL);
+        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        responseBuilder = new RateLimitResponseBuilder(
+                new ProblemDetailFactory(errorProperties), objectMapper);
         interceptor = new RateLimitInterceptor(rateLimitService, properties, ipResolver, responseBuilder);
     }
 
@@ -74,7 +89,12 @@ class RateLimitInterceptorTest {
 
         assertThat(allowed).isFalse();
         assertThat(response.getStatus()).isEqualTo(429);
-        assertThat(response.getContentAsString()).contains("\"status\":429", "\"title\":\"Too Many Requests\"");
+        // Content-Type is application/problem+json (with the UTF-8 charset we set)
+        assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        assertThat(response.getContentAsString())
+                .contains("\"status\":429", "\"title\":\"Too Many Requests\"")
+                // `type` must follow the configured error base URL, not a hardcoded constant
+                .contains("\"type\":\"" + TEST_ERROR_BASE_URL + "/429\"");
     }
 
     private HandlerMethod handlerMethod(String methodName) throws NoSuchMethodException {

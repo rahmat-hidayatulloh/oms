@@ -2,6 +2,7 @@ package com.oms.auth.security;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -79,6 +80,12 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
+                // jti (unique token id): tanpa klaim ini, dua token untuk user
+                // yang sama pada detik yang sama (login lalu /auth/refresh
+                // seketika) punya payload identik dan tanda tangan HMAC
+                // deterministik -> token hasil rotasi byte-identik dengan yang
+                // lama dan deteksi replay lolos. UUID menjamin setiap token unik.
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .claim(SecurityConstants.CLAIM_ROLE, role)
                 .claim(SecurityConstants.CLAIM_TOKEN_TYPE, tokenType)
